@@ -116,7 +116,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
   private var services: TKMServices!
   private var showMenuButton: Bool!
   private var showSubjectHistory: Bool!
-  private var delegate: ReviewViewControllerDelegate!
+  private weak var delegate: ReviewViewControllerDelegate!
 
   private var activeQueue = [ReviewItem]()
   private var reviewQueue = [ReviewItem]()
@@ -330,9 +330,12 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     // all the way to the bottom - the page selector view is below it.  Take this into account:
     // find out how far the bottom of our UIView is from the bottom of the window, and subtract that
     // distance from the constraint height.
+    guard let window = view.window else {
+      return
+    }
     let viewBottomLeft = view.convert(CGPoint(x: 0.0, y: view.bounds.maxY),
-                                      to: view.window)
-    let windowBottom = view.window!.bounds.maxY
+                                      to: window)
+    let windowBottom = window.bounds.maxY
     let distanceFromViewBottomToWindowBottom = windowBottom - viewBottomLeft.y
 
     answerFieldToBottomConstraint.constant = CGFloat(height) - distanceFromViewBottomToWindowBottom
@@ -485,10 +488,13 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
 
     answerField.text = nil
     answerField.placeholder = taskTypePlaceholder
-    kanaInput.alphabet = (
-      activeSubject.primaryReadings.first!.hasType &&
-        activeSubject.primaryReadings.first!.type == .onyomi &&
-        Settings.useKatakanaForOnyomi) ? .katakana : .hiragana
+    if let firstReading = activeSubject.primaryReadings.first {
+      kanaInput.alphabet = (
+        firstReading.hasType && firstReading.type == .onyomi && Settings.useKatakanaForOnyomi) ?
+        .katakana : .hiragana
+    } else {
+      kanaInput.alphabet = .hiragana
+    }
 
     let setupContextFunc = {
       (ctx: AnimationContext) in
