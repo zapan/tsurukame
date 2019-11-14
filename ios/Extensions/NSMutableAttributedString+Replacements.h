@@ -16,21 +16,17 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class TKMServices;
-@class TKMSubject;
-@class TKMStudyMaterials;
-@protocol TKMSubjectDelegate;
+@interface NSMutableAttributedString (Replacements)
 
-@interface TKMSubjectDetailsView : UITableView
+- (NSMutableAttributedString *)replaceFontSize:(CGFloat)newSize;
+- (NSMutableAttributedString *)replaceTextColor:(UIColor *)newColor;
 
-- (void)setupWithServices:(TKMServices *)services
-                showHints:(BOOL)showHints
-          subjectDelegate:(id<TKMSubjectDelegate>)subjectDelegate;
+@end
 
-- (void)updateWithSubject:(TKMSubject *)subject
-           studyMaterials:(nullable TKMStudyMaterials *)studyMaterials;
-- (void)playAudio;
-- (void)deselectLastSubjectChipTapped;
+@interface NSAttributedString (Replacements)
+
+- (NSAttributedString *)stringWithFontSize:(CGFloat)newSize;
+- (NSAttributedString *)stringWithTextColor:(UIColor *)newColor;
 
 @end
 

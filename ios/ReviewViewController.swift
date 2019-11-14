@@ -57,6 +57,43 @@ private func copyLabel(_ original: UILabel) -> UILabel {
   return copy
 }
 
+private let kDotColorApprentice = UIColor(red: 0.87, green: 0.00, blue: 0.58, alpha: 1.0)
+private let kDotColorGuru = UIColor(red: 0.53, green: 0.18, blue: 0.62, alpha: 1.0)
+private let kDotColorMaster = UIColor(red: 0.16, green: 0.30, blue: 0.86, alpha: 1.0)
+private let kDotColorEnlightened = UIColor(red: 0.00, green: 0.58, blue: 0.87, alpha: 1.0)
+private let kDotColorBurned = UIColor(red: 0.26, green: 0.26, blue: 0.26, alpha: 1.0)
+
+private func getDotsForLevel(_ level: Int32) -> NSAttributedString? {
+  var string: NSMutableAttributedString?
+  switch level {
+  case 1:
+    string = NSMutableAttributedString(string: "•◦◦◦", attributes: [.foregroundColor: kDotColorApprentice])
+  case 2:
+    string = NSMutableAttributedString(string: "••◦◦", attributes: [.foregroundColor: kDotColorApprentice])
+  case 3:
+    string = NSMutableAttributedString(string: "•••◦", attributes: [.foregroundColor: kDotColorApprentice])
+  case 4:
+    string = NSMutableAttributedString(string: "••••◦", attributes: [.foregroundColor: kDotColorApprentice])
+    string?.addAttribute(.foregroundColor, value: kDotColorGuru, range: NSRange(location: 4, length: 1))
+  case 5:
+    string = NSMutableAttributedString(string: "•◦", attributes: [.foregroundColor: kDotColorGuru])
+  case 6:
+    string = NSMutableAttributedString(string: "••◦", attributes: [.foregroundColor: kDotColorGuru])
+    string?.addAttribute(.foregroundColor, value: kDotColorMaster, range: NSRange(location: 2, length: 1))
+  case 7:
+    string = NSMutableAttributedString(string: "•◦", attributes: [.foregroundColor: kDotColorMaster])
+    string?.addAttribute(.foregroundColor, value: kDotColorEnlightened, range: NSRange(location: 1, length: 1))
+  case 8:
+    string = NSMutableAttributedString(string: "•◦", attributes: [.foregroundColor: kDotColorEnlightened])
+    string?.addAttribute(.foregroundColor, value: kDotColorBurned, range: NSRange(location: 1, length: 1))
+  case 9:
+    string = NSMutableAttributedString(string: "•", attributes: [.foregroundColor: kDotColorBurned])
+  default:
+    string = nil
+  }
+  return string
+}
+
 private class AnimationContext {
   let cheats: Bool
   let subjectDetailsViewShown: Bool
@@ -158,7 +195,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
   @IBOutlet private var addSynonymButton: UIButton!
   @IBOutlet private var revealAnswerButton: UIButton!
   @IBOutlet private var progressBar: UIProgressView!
-  @IBOutlet private var subjectDetailsView: TKMSubjectDetailsView!
+  @IBOutlet private var subjectDetailsView: SubjectDetailsView!
   @IBOutlet private var previousSubjectButton: UIButton!
 
   @IBOutlet private var wrapUpLabel: UILabel!
@@ -169,6 +206,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
   @IBOutlet private var successRateIcon: UIImageView!
   @IBOutlet private var doneIcon: UIImageView!
   @IBOutlet private var queueIcon: UIImageView!
+  @IBOutlet private var levelLabel: UILabel!
 
   @IBOutlet private var answerFieldToBottomConstraint: NSLayoutConstraint!
   @IBOutlet private var answerFieldToSubjectDetailsViewConstraint: NSLayoutConstraint!
@@ -255,7 +293,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow),
                                            name: UIResponder.keyboardWillShowNotification, object: nil)
 
-    subjectDetailsView.setup(with: services, showHints: false, subjectDelegate: self)
+    subjectDetailsView.setup(withServices: services, showHints: false, delegate: self)
 
     answerField.delegate = kanaInput
     answerField.addTarget(self, action: #selector(answerFieldValueDidChange), for: UIControl.Event.editingChanged)
@@ -417,7 +455,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     // Choose whether to ask the meaning or the reading.
     if activeTask.answeredMeaning {
       activeTaskType = TKMTaskType.reading
-    } else if activeTask.answeredReading {
+    } else if activeTask.answeredReading || activeSubject.hasRadical {
       activeTaskType = TKMTaskType.meaning
     } else if Settings.groupMeaningReading {
       activeTaskType = Settings.meaningFirst ? TKMTaskType.meaning : TKMTaskType.reading
@@ -485,6 +523,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     doneLabel.accessibilityLabel = doneText + " done"
     queueLabel.accessibilityLabel = queueText + " remaining"
     questionLabel.accessibilityLabel = "Japanese " + subjectTypePrompt + ". Question"
+    levelLabel.accessibilityLabel = "srs level \(activeTask.assignment.srsStage)"
 
     answerField.text = nil
     answerField.placeholder = taskTypePlaceholder
@@ -494,6 +533,14 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
         .katakana : .hiragana
     } else {
       kanaInput.alphabet = .hiragana
+    }
+
+    if Settings.showSRSLevelIndicator {
+      levelLabel.attributedText = getDotsForLevel(activeTask.assignment.srsStage)
+      // Make sure the level up pop animation does not leave this transparent
+      levelLabel.alpha = 1
+    } else {
+      levelLabel.attributedText = nil
     }
 
     let setupContextFunc = {
@@ -640,12 +687,17 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
       if ctx.cheats {
         addSynonymButton.isHidden = true
       }
+      answerField.becomeFirstResponder()
     }
   }
 
   // MARK: - Previous subject button
 
   func animateLabelToPreviousSubjectButton(_ label: UILabel) {
+    guard let previousSubject = previousSubject else {
+      return
+    }
+
     let oldLabelCenter = label.center
     let labelBounds = CGRect(origin: CGPoint.zero, size: label.sizeThatFits(CGSize.zero))
     label.bounds = labelBounds
@@ -814,7 +866,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
 
   func shakeView(_ view: UIView) {
     let animation = CABasicAnimation(keyPath: "position")
-    animation.duration = 0.0
+    animation.duration = 0.1
     animation.repeatCount = 3
     animation.autoreverses = true
     animation.fromValue = NSValue(cgPoint: CGPoint(x: view.center.x - 10, y: view.center.y))
@@ -847,14 +899,14 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     case .meaning:
       firstTimeAnswered = !activeTask.answer.hasMeaningWrong
       if firstTimeAnswered ||
-        (lastMarkAnswerWasFirstTime && result == .Correct) {
+        (lastMarkAnswerWasFirstTime && result == .OverrideAnswerCorrect) {
         activeTask.answer.meaningWrong = !correct
       }
       activeTask.answeredMeaning = correct
     case .reading:
       firstTimeAnswered = !activeTask.answer.hasReadingWrong
       if firstTimeAnswered ||
-        (lastMarkAnswerWasFirstTime && result == .Correct) {
+        (lastMarkAnswerWasFirstTime && result == .OverrideAnswerCorrect) {
         activeTask.answer.readingWrong = !correct
       }
       activeTask.answeredReading = correct
@@ -912,10 +964,11 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
         previousSubjectLabel = copyLabel(questionLabel)
         previousSubject = activeSubject
       }
-      randomTask()
       if correct {
-        RunSuccessAnimation(answerField, doneLabel, isSubjectFinished, didLevelUp, newSrsStage)
+        RunSuccessAnimation(answerField, doneLabel, levelLabel, isSubjectFinished, didLevelUp, newSrsStage)
       }
+      randomTask()
+
       if let previousSubjectLabel = previousSubjectLabel {
         animateLabelToPreviousSubjectButton(previousSubjectLabel)
       }
@@ -938,7 +991,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
   }
 
   @IBAction func revealAnswerButtonPressed(_: Any) {
-    subjectDetailsView.update(with: activeSubject, studyMaterials: activeStudyMaterials)
+    subjectDetailsView.update(withSubject: activeSubject, studyMaterials: activeStudyMaterials)
 
     let setupContextFunc = { (ctx: AnimationContext) in
       if self.questionLabel.font.familyName != self.normalFontName {
