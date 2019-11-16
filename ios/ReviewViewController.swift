@@ -281,8 +281,8 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    TKMAddShadowToView(questionLabel, 1, 0.2, 4)
-    TKMAddShadowToView(previousSubjectButton, 0, 0.7, 4)
+    TKMStyle.addShadowToView(questionLabel, offset: 1, opacity: 0.2, radius: 4)
+    TKMStyle.addShadowToView(previousSubjectButton, offset: 0, opacity: 0.7, radius: 4)
 
     wrapUpIcon.image = UIImage(named: "baseline_access_time_black_24pt")?.withRenderingMode(UIImage.RenderingMode.alwaysTemplate)
 
@@ -293,7 +293,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow),
                                            name: UIResponder.keyboardWillShowNotification, object: nil)
 
-    subjectDetailsView.setup(withServices: services, showHints: false, delegate: self)
+    subjectDetailsView.setup(withServices: services, delegate: self)
 
     answerField.delegate = kanaInput
     answerField.addTarget(self, action: #selector(answerFieldValueDidChange), for: UIControl.Event.editingChanged)
@@ -302,7 +302,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
       menuButton.isHidden = true
     }
 
-    normalFontName = kTKMJapaneseFontName
+    normalFontName = TKMStyle.japaneseFontName
     currentFontName = normalFontName
     defaultFontSize = Double(questionLabel.font.pointSize)
 
@@ -512,10 +512,10 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     promptLabel!.textColor = promptTextColor
 
     // Submit button.
-    submitButton.isEnabled = true
+    submitButton.isEnabled = false
 
     // Background gradients.
-    questionBackground.animateColors(to: TKMGradientForAssignment(activeTask.assignment), duration: animationDuration)
+    questionBackground.animateColors(to: TKMStyle.gradient(forAssignment: activeTask.assignment), duration: animationDuration)
     promptBackground.animateColors(to: promptGradient, duration: animationDuration)
 
     // Accessibility.
@@ -537,8 +537,6 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
 
     if Settings.showSRSLevelIndicator {
       levelLabel.attributedText = getDotsForLevel(activeTask.assignment.srsStage)
-      // Make sure the level up pop animation does not leave this transparent
-      levelLabel.alpha = 1
     } else {
       levelLabel.attributedText = nil
     }
@@ -708,7 +706,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
     let newButtonHeight =
       kPreviousSubjectButtonPadding * 2 + labelBounds.size.height * kPreviousSubjectScale
 
-    let newGradient = TKMGradientForSubject(previousSubject)
+    let newGradient = TKMStyle.gradient(forSubject: previousSubject)
 
     view.layoutIfNeeded()
     UIView.animate(withDuration: kPreviousSubjectAnimationDuration,
@@ -782,7 +780,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
 
   @objc func toggleFont() {
     let useCustomFont =
-      questionLabel.font == TKMJapaneseFontLight(questionLabel.font.pointSize)
+      questionLabel.font == TKMStyle.japaneseFontLight(size: questionLabel.font.pointSize)
     setCustomQuestionLabelFont(useCustomFont: useCustomFont)
   }
 
@@ -964,10 +962,13 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, TKMSubjectDel
         previousSubjectLabel = copyLabel(questionLabel)
         previousSubject = activeSubject
       }
+      randomTask()
       if correct {
+        // We must start the success animations *after* all the UI elements have been moved to their
+        // new locations by randomTask(), so that, for example, the success sparkles animate from
+        // the final position of the answerField, not the original position.
         RunSuccessAnimation(answerField, doneLabel, levelLabel, isSubjectFinished, didLevelUp, newSrsStage)
       }
-      randomTask()
 
       if let previousSubjectLabel = previousSubjectLabel {
         animateLabelToPreviousSubjectButton(previousSubjectLabel)
