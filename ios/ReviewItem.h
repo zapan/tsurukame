@@ -47,6 +47,7 @@ typedef NS_ENUM(NSInteger, TKMTaskType) {
 @property(nonatomic) TKMProgress *answer;
 
 - (BOOL)compareForLessons:(ReviewItem *)other;
+- (BOOL)compareForReviews:(ReviewItem *)other;
 
 - (void)reset;
 

@@ -94,6 +94,20 @@
   return (self.assignment.subjectId <= other.assignment.subjectId);
 }
 
+- (BOOL)compareForReviews:(ReviewItem *)other {
+  if ([Settings.lessonOrder count]) {
+    NSUInteger selfIndex = [self getSubjectTypeIndex:self.assignment.subjectType];
+    NSUInteger otherIndex = [self getSubjectTypeIndex:other.assignment.subjectType];
+    if (selfIndex < otherIndex) {
+      return true;
+    } else if (selfIndex > otherIndex) {
+      return false;
+    }
+  }
+
+  return (self.assignment.subjectId <= other.assignment.subjectId);
+}
+
 - (void)reset {
   _answer.hasMeaningWrong = NO;
   _answer.hasReadingWrong = NO;
