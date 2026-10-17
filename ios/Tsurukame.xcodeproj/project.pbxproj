@@ -214,6 +214,10 @@
 		E881943B2A6BC0CF002C2E1C /* ArtworkModelItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E881943A2A6BC0CF002C2E1C /* ArtworkModelItem.swift */; };
 		E881943F2A6BC38A002C2E1C /* ArtworkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E881943E2A6BC38A002C2E1C /* ArtworkManager.swift */; };
 		EC6A5487F6875EC64C63B6B2 /* Pods_FontScreenshotter_FontScreenshotterUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 404461BC39B4A19B128F9E69 /* Pods_FontScreenshotter_FontScreenshotterUITests.framework */; };
+		F54B6C963046E12E00E59C71 /* LevelSelectorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54B6C953046E12E00E59C71 /* LevelSelectorViewController.swift */; };
+		F5FBB34E3042E5AB0006D66C /* TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34C3042E5AB0006D66C /* TranslationService.swift */; };
+		F5FBB34F3042E5AB0006D66C /* LocalCachingClient+Translations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */; };
+		F5FBB3503042E5AB0006D66C /* TranslationSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */; };
 		F472FEF47C88DAECCBC93B48 /* HankoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03F2B2960505C9046CF238A /* HankoView.swift */; };
 /* End PBXBuildFile section */
 
@@ -495,6 +499,10 @@
 		F33812F134DC80E5D981C40E /* Pods_FontScreenshotter.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_FontScreenshotter.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9C48CF5ADDC56D1A96EDE8C /* SceneDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		FC80AAF9736A570E3C4CC09E /* Pods_Tsurukame.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Tsurukame.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F54B6C953046E12E00E59C71 /* LevelSelectorViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelSelectorViewController.swift; sourceTree = "<group>"; };
+		F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalCachingClient+Translations.swift"; sourceTree = "<group>"; };
+		F5FBB34C3042E5AB0006D66C /* TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationService.swift; sourceTree = "<group>"; };
+		F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSettingsViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -627,6 +635,10 @@
 		630FD60A1FC45BDF00D21C1F = {
 			isa = PBXGroup;
 			children = (
+				F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */,
+				F5FBB34C3042E5AB0006D66C /* TranslationService.swift */,
+				F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */,
+				F54B6C953046E12E00E59C71 /* LevelSelectorViewController.swift */,
 				6324AE3D2F9DC7FF0089066C /* RadicalCharacterImages.swift */,
 				96A335062EEF5F800017BC70 /* BottomSheetAction.swift */,
 				9721708B2DBAF3A6001DFFED /* SubjectsExcluded.storyboard */,
@@ -1449,6 +1461,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F54B6C963046E12E00E59C71 /* LevelSelectorViewController.swift in Sources */,
+				F5FBB34E3042E5AB0006D66C /* TranslationService.swift in Sources */,
+				F5FBB34F3042E5AB0006D66C /* LocalCachingClient+Translations.swift in Sources */,
+				F5FBB3503042E5AB0006D66C /* TranslationSettingsViewController.swift in Sources */,
 				638D197525C6AA4B00B80544 /* MarkupModelItem.swift in Sources */,
 				63A5598527E433E000E7BBCB /* NavigationController.swift in Sources */,
 				638A5C4E25A471F9001A7AEE /* AppDelegate.swift in Sources */,

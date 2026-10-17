@@ -16,6 +16,7 @@ import Foundation
 import UIKit
 
 class AppSettingsViewController: SettingsTableViewController, TKMViewController {
+  private var services: TKMServices!
   private var model: TableModel?
   private var notificationHandler: ((Bool) -> Void)?
 
@@ -27,6 +28,10 @@ class AppSettingsViewController: SettingsTableViewController, TKMViewController 
   // MARK: - TKMViewController
 
   var canSwipeToGoBack: Bool { true }
+
+  func setup(services: TKMServices) {
+    self.services = services
+  }
 
   // MARK: - UIViewController
 
@@ -90,6 +95,21 @@ class AppSettingsViewController: SettingsTableViewController, TKMViewController 
                               on: Settings.notificationSounds,
                               switchHandler: soundSwitchChanged))
 
+    // Translations section
+    model.add(section: "Translations")
+    let (_, translatedCount) = services.localCachingClient.getTranslationProgress()
+    let translationSubtitle = Settings.translationsEnabled
+      ?
+      "\(Settings.translationLanguage.flagEmoji) \(Settings.translationLanguage.description) • \(translatedCount) subjects"
+      : "Off"
+    model.add(BasicModelItem(style: .value1,
+                             title: "Translate Content",
+                             subtitle: translationSubtitle,
+                             accessoryType: .disclosureIndicator) {
+        [unowned self] in
+        self.didTapTranslations()
+      })
+
     self.model = model
     styleRows(model)
     model.reloadTable()
@@ -97,6 +117,11 @@ class AppSettingsViewController: SettingsTableViewController, TKMViewController 
 
   private func didTapInterfaceStyle() {
     navigationController?.pushViewController(makeInterfaceStyleViewController(), animated: true)
+  }
+
+  private func didTapTranslations() {
+    let vc = TranslationSettingsViewController(services: services)
+    navigationController?.pushViewController(vc, animated: true)
   }
 
   private func allReviewsSwitchChanged(_ switchView: UISwitch) {

@@ -1,0 +1,105 @@
+// Copyright 2026 David Sansome
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+option go_package = "github.com/davidsansome/tsurukame;proto";
+option objc_class_prefix = "TKM";
+option swift_prefix = "TKM";
+
+package proto;
+
+// Contiene solo los campos traducibles de un Subject.
+// Se almacena por separado del Subject original para mantener
+// una separación clara entre datos de WaniKani y traducciones locales.
+message TranslatedSubject {
+  // ID del subject original (reference a subjects.id)
+  optional int64 subject_id = 1;
+  
+  // Código de idioma de destino (ISO 639-1)
+  // Ejemplos: "ES", "FR", "DE", "IT", "PT-PT", "PT-BR"
+  optional string target_lang = 2;
+  
+  // Hash del contenido original en inglés (MD5 o SHA256)
+  // Se usa para detectar cuando WaniKani actualiza el contenido original
+  // y necesitamos re-traducir
+  optional string original_hash = 3;
+  
+  // ============================================================
+  // Campos traducibles para RADICAL
+  // ============================================================
+  
+  // Traducción de Radical.mnemonic
+  optional string radical_mnemonic = 10;
+  
+  // Traducción de Radical.deprecated_mnemonic
+  optional string radical_deprecated_mnemonic = 11;
+  
+  // ============================================================
+  // Campos traducibles para KANJI
+  // ============================================================
+  
+  // Traducción de Kanji.meaning_mnemonic
+  optional string kanji_meaning_mnemonic = 20;
+  
+  // Traducción de Kanji.meaning_hint
+  optional string kanji_meaning_hint = 21;
+  
+  // Traducción de Kanji.reading_mnemonic
+  // NOTA: Puede contener texto en inglés si la traducción rompe
+  // el juego de palabras fonético (ver reading_mnemonic_uses_english)
+  optional string kanji_reading_mnemonic = 22;
+  
+  // Traducción de Kanji.reading_hint
+  optional string kanji_reading_hint = 23;
+  
+  // ============================================================
+  // Campos traducibles para VOCABULARY
+  // ============================================================
+  
+  // Traducción de Vocabulary.meaning_explanation
+  optional string vocabulary_meaning_explanation = 30;
+  
+  // Traducción de Vocabulary.reading_explanation
+  // NOTA: Puede contener texto en inglés si la traducción rompe
+  // el juego de palabras fonético (ver reading_explanation_uses_english)
+  optional string vocabulary_reading_explanation = 31;
+  
+  // Traducciones de las frases de contexto (Vocabulary.sentences[].english)
+  // El orden corresponde al orden en subject.vocabulary.sentences
+  repeated string vocabulary_sentence_english = 40;
+  
+  // ============================================================
+  // Metadatos de traducción
+  // ============================================================
+  
+  // true si kanji_reading_mnemonic contiene texto en inglés porque
+  // la traducción directa rompía el juego de palabras fonético.
+  // Formato usado: "[inglés] ([español])"
+  optional bool reading_mnemonic_uses_english = 50;
+  
+  // true si vocabulary_reading_explanation contiene texto en inglés
+  // por la misma razón que reading_mnemonic_uses_english
+  optional bool reading_explanation_uses_english = 51;
+  
+  // Timestamp de cuándo se creó esta traducción (Unix epoch)
+  optional int32 created_at = 60;
+  
+  // Timestamp de la última actualización (Unix epoch)
+  optional int32 updated_at = 61;
+  
+  // Versión del algoritmo de traducción usado
+  // Útil si en el futuro cambiamos la estrategia de traducción
+  // y queremos re-traducir subjects antiguos
+  optional int32 translation_version = 62;
+}

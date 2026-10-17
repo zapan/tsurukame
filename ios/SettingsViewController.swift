@@ -109,6 +109,10 @@ class SettingsViewController: SettingsTableViewController, TKMViewController {
       let vc = segue.destination as! ReviewSettingsViewController
       vc.setup(services: services)
 
+    case .appSettings:
+      let vc = segue.destination as! AppSettingsViewController
+      vc.setup(services: services)
+
     default:
       break
     }
