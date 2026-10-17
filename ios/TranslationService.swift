@@ -1,4 +1,4 @@
-// Copyright 2026 David Sansome
+// Copyright David Sansome
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -512,17 +512,18 @@ class TranslationService {
     return true
   }
 
-  /// Fix reading tags by replacing translated words with romaji and adding translation in parentheses
+  /// Fix reading tags by replacing translated words with romaji and adding translation in
+  /// parentheses
   private func fixReadingTags(translatedText: String, targetReading: String) -> String {
     var result = translatedText
     let romanReading = romanize(targetReading)
-    
+
     let pattern = "<reading>([^<]+)</reading>\\s*\\(([^)]+)\\)"
     guard let regex = try? NSRegularExpression(pattern: pattern) else {
       return translatedText
     }
 
-    let matches = regex.matches(in: translatedText, range: NSRange(translatedText.startIndex..., 
+    let matches = regex.matches(in: translatedText, range: NSRange(translatedText.startIndex...,
                                                                    in: translatedText))
 
     // Process in reverse order to not affect indices
@@ -531,7 +532,7 @@ class TranslationService {
             let fullRange = Range(match.range, in: translatedText) else { continue }
 
       let translatedWord = String(translatedText[translatedWordRange])
-      
+
       // Replacement: <reading>romaji</reading> (hiragana) (spanish_word)
       let replacement = "<reading>\(romanReading)</reading> (\(targetReading)) (\(translatedWord))"
       result.replaceSubrange(fullRange, with: replacement)

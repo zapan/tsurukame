@@ -1,4 +1,4 @@
-// Copyright 2026 David Sansome
+// Copyright David Sansome
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,7 +65,8 @@ extension LocalCachingClient {
     }
 
     // Try to get translation
-    guard let translation = getTranslation(subjectId: original.id, targetLang: Settings.translationLanguage) else {
+    guard let translation = getTranslation(subjectId: original.id,
+                                           targetLang: Settings.translationLanguage) else {
       // No translation available, return original
       return original
     }
@@ -428,7 +429,7 @@ extension LocalCachingClient {
   /// Fix reading tags in existing translations that use the old fallback format
   /// This updates translations where reading tags were broken by translation
   public func repairReadingTagsInTranslations(targetLang: String,
-                                             progressCallback: ((Int, Int) -> Void)? = nil) {
+                                              progressCallback: ((Int, Int) -> Void)? = nil) {
     databaseQueue.inDatabase { db in
       // Get all subjects with translations for the target language
       let cursor = db.query("""
@@ -439,7 +440,7 @@ extension LocalCachingClient {
       """, args: [targetLang])
 
       var subjectsToFix: [(subjectId: Int64, translation: TKMTranslatedSubject,
-                          subject: TKMSubject)] = []
+                           subject: TKMSubject)] = []
 
       while cursor.next() {
         guard let translationData = cursor.data(forColumn: "pb"),
@@ -452,8 +453,8 @@ extension LocalCachingClient {
         // Only process if it has reading mnemonics/explanations that use English fallback
         if translation.readingMnemonicUsesEnglish || translation.readingExplanationUsesEnglish {
           subjectsToFix.append((subjectId: translation.subjectID,
-                               translation: translation,
-                               subject: subject))
+                                translation: translation,
+                                subject: subject))
         }
       }
 
@@ -467,25 +468,25 @@ extension LocalCachingClient {
         // Log subject info
         let subjectType = item.subject.hasKanji ? "KANJI" : "VOCAB"
         let subjectName = item.subject.japanese
-        NSLog("[TR] [REPAIR] Processing %@ #%d: %@ (ID: %d)", 
+        NSLog("[TR] [REPAIR] Processing %@ #%d: %@ (ID: %d)",
               subjectType, index + 1, subjectName, item.subjectId)
 
         // Fix kanji reading_mnemonic
-        if item.subject.hasKanji && updated.readingMnemonicUsesEnglish {
+        if item.subject.hasKanji, updated.readingMnemonicUsesEnglish {
           if let primaryReading = item.subject.readings.first(where: { $0.isPrimary })?.reading {
             let englishText = item.subject.kanji.readingMnemonic
             let spanishText = updated.kanjiReadingMnemonic
-            
+
             let fixed = self.fixReadingTags(englishText: englishText,
-                                           spanishText: spanishText,
-                                           reading: primaryReading)
-            
+                                            spanishText: spanishText,
+                                            reading: primaryReading)
+
             if fixed != spanishText {
-              NSLog("[TR] [REPAIR] KANJI reading_mnemonic for '%@' (reading: %@)", 
+              NSLog("[TR] [REPAIR] KANJI reading_mnemonic for '%@' (reading: %@)",
                     subjectName, primaryReading)
               NSLog("[TR] [REPAIR] BEFORE: %@", spanishText)
               NSLog("[TR] [REPAIR] AFTER:  %@", fixed)
-              
+
               updated.kanjiReadingMnemonic = fixed
               updated.updatedAt = Int32(Date().timeIntervalSince1970)
               needsUpdate = true
@@ -496,21 +497,21 @@ extension LocalCachingClient {
         }
 
         // Fix vocabulary reading_explanation
-        if item.subject.hasVocabulary && updated.readingExplanationUsesEnglish {
+        if item.subject.hasVocabulary, updated.readingExplanationUsesEnglish {
           if let primaryReading = item.subject.readings.first(where: { $0.isPrimary })?.reading {
             let englishText = item.subject.vocabulary.readingExplanation
             let spanishText = updated.vocabularyReadingExplanation
-            
+
             let fixed = self.fixReadingTags(englishText: englishText,
-                                           spanishText: spanishText,
-                                           reading: primaryReading)
-            
+                                            spanishText: spanishText,
+                                            reading: primaryReading)
+
             if fixed != spanishText {
-              NSLog("[TR] [REPAIR] VOCAB reading_explanation for '%@' (reading: %@)", 
+              NSLog("[TR] [REPAIR] VOCAB reading_explanation for '%@' (reading: %@)",
                     subjectName, primaryReading)
               NSLog("[TR] [REPAIR] BEFORE: %@", spanishText)
               NSLog("[TR] [REPAIR] AFTER:  %@", fixed)
-              
+
               updated.vocabularyReadingExplanation = fixed
               updated.updatedAt = Int32(Date().timeIntervalSince1970)
               needsUpdate = true
@@ -529,7 +530,7 @@ extension LocalCachingClient {
             SET pb = ?, updated_at = ?
             WHERE subject_id = ? AND target_lang = ?
           """, args: [updatedData, updated.updatedAt, item.subjectId, targetLang])
-          
+
           NSLog("[TR] [REPAIR] ✅ Updated translation in database")
         } else {
           NSLog("[TR] [REPAIR] ⚠️  No updates needed for this subject")
@@ -546,41 +547,40 @@ extension LocalCachingClient {
   private func fixReadingTags(englishText: String, spanishText: String, reading: String) -> String {
     // Extract the English keyword from the original text
     let englishKeyword = extractKeywordFromText(englishText, reading: reading)
-    
+
     // Extract the Spanish keyword from the translated text
     let spanishKeyword = extractKeywordFromText(spanishText, reading: reading)
-    
+
     // Apply the fix
-    return fixReadingTagsInText(spanishText, 
-                                reading: reading, 
+    return fixReadingTagsInText(spanishText,
+                                reading: reading,
                                 englishKeyword: englishKeyword,
                                 spanishKeyword: spanishKeyword)
   }
-  
+
   private func extractKeywordFromText(_ text: String, reading: String) -> String? {
     // Pattern to find <reading>word</reading> followed by parentheses
     let pattern = "<reading>([^<]+)</reading>(?:\\s*\\([^)]*\\))+"
     guard let regex = try? NSRegularExpression(pattern: pattern) else {
       return nil
     }
-    
+
     if let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
        let readingWordRange = Range(match.range(at: 1), in: text),
        let matchRange = Range(match.range, in: text) {
-      
       let readingWord = String(text[readingWordRange])
       let matchedText = String(text[matchRange])
-      
+
       // Extract all content in parentheses
       let parenPattern = "\\(([^)]+)\\)"
       guard let parenRegex = try? NSRegularExpression(pattern: parenPattern) else {
         return readingWord // Fallback to word in <reading> tag
       }
-      
-      let parenMatches = parenRegex.matches(in: matchedText, 
-                                           range: NSRange(matchedText.startIndex..., 
-                                                         in: matchedText))
-      
+
+      let parenMatches = parenRegex.matches(in: matchedText,
+                                            range: NSRange(matchedText.startIndex...,
+                                                           in: matchedText))
+
       // Get all words from parentheses, excluding the reading itself and romaji
       let romanReading = romanize(reading)
       var words: [String] = []
@@ -593,16 +593,16 @@ extension LocalCachingClient {
           }
         }
       }
-      
+
       // Return the last non-hiragana/non-romaji word found (the actual keyword)
       // If no words found in parentheses, return the word from <reading> tag
       return words.last ?? readingWord
     }
-    
+
     return nil
   }
-  
-  private func fixReadingTagsInText(_ text: String, 
+
+  private func fixReadingTagsInText(_ text: String,
                                     reading: String,
                                     englishKeyword: String?,
                                     spanishKeyword: String?) -> String {
@@ -622,9 +622,9 @@ extension LocalCachingClient {
     // Process in reverse order to not affect indices
     for match in matches.reversed() {
       guard let fullRange = Range(match.range, in: text) else { continue }
-      
+
       let matchedText = String(text[fullRange])
-      
+
       // Verify this match contains our target reading
       if !matchedText.contains("(\(reading))") {
         continue
@@ -639,7 +639,7 @@ extension LocalCachingClient {
       } else {
         continue // Skip if we don't have keywords
       }
-      
+
       // Replacement: <reading>romaji</reading> (hiragana) (english, spanish)
       let replacement = "<reading>\(romanReading)</reading> (\(reading)) (\(keywordPart))"
       result.replaceSubrange(fullRange, with: replacement)

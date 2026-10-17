@@ -1,4 +1,4 @@
-// Copyright 2026 David Sansome
+// Copyright David Sansome
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -213,27 +213,26 @@ class TranslationSettingsViewController: UITableViewController {
 
     let userLevel = services.localCachingClient.getUserInfo()?.level ?? 1
     let maxLevel = services.localCachingClient.maxLevelGrantedBySubscription
-    
-    let levelSelector = LevelSelectorViewController(
-      currentLevel: userLevel,
-      maxLevel: Int32(maxLevel),
-      onSelect: { [weak self] selectedLevel in
-        self?.performManualTranslation(upToLevel: selectedLevel)
-      }
-    )
-    
+
+    let levelSelector = LevelSelectorViewController(currentLevel: userLevel,
+                                                    maxLevel: Int32(maxLevel),
+                                                    onSelect: { [weak self] selectedLevel in
+                                                      self?
+                                                        .performManualTranslation(upToLevel: selectedLevel)
+                                                    })
+
     present(levelSelector, animated: true)
   }
 
   private func performManualTranslation(upToLevel: Int32) {
     NSLog("[TR] performManualTranslation: \(upToLevel)")
-    
+
     // Show progress HUD
-    let hud = UIAlertController(title: "Downloading Translations", 
-                                message: "0 / 0", 
+    let hud = UIAlertController(title: "Downloading Translations",
+                                message: "0 / 0",
                                 preferredStyle: .alert)
     present(hud, animated: true)
-    
+
     let progress = Progress(totalUnitCount: 100)
 
     // Update progress message
@@ -248,14 +247,15 @@ class TranslationSettingsViewController: UITableViewController {
       }
 
     // Perform download
-    services.localCachingClient.downloadTranslations(upToLevel: Int32(upToLevel), progress: progress)
+    services.localCachingClient.downloadTranslations(upToLevel: Int32(upToLevel),
+                                                     progress: progress)
       .done { [weak self] in
         guard let self = self else { return }
         self.progressObservation?.invalidate()
-        
+
         hud.dismiss(animated: true) {
           self.rerender()
-          
+
           let successAlert = UIAlertController(title: "Success",
                                                message: "Translations downloaded successfully!",
                                                preferredStyle: .alert)
@@ -266,7 +266,7 @@ class TranslationSettingsViewController: UITableViewController {
       .catch { [weak self] error in
         guard let self = self else { return }
         self.progressObservation?.invalidate()
-        
+
         hud.dismiss(animated: true) {
           self.rerender()
           self.showError(message: "Translation failed: \(error.localizedDescription)")
@@ -329,13 +329,13 @@ class TranslationSettingsViewController: UITableViewController {
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       guard let self = self else { return }
 
-      self.services.localCachingClient.repairReadingTagsInTranslations(
-        targetLang: Settings.translationLanguage.rawValue
-      ) { current, total in
-        DispatchQueue.main.async {
-          hud.message = "\(current) / \(total)"
+      self.services.localCachingClient
+        .repairReadingTagsInTranslations(targetLang: Settings.translationLanguage
+          .rawValue) { current, total in
+            DispatchQueue.main.async {
+              hud.message = "\(current) / \(total)"
+            }
         }
-      }
 
       DispatchQueue.main.async {
         hud.dismiss(animated: true) {
