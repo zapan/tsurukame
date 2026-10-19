@@ -341,8 +341,7 @@ extension LocalCachingClient {
 
     NSLog("[TR] Manually downloading translations for \(untranslated.count) subjects")
 
-    // Translate in batches of 10
-    let batchSize = 10
+    let batchSize = 50
     var batchPromises: [Promise<Void>] = []
 
     for i in stride(from: 0, to: untranslated.count, by: batchSize) {
