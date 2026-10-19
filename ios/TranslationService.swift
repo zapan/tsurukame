@@ -61,10 +61,12 @@ class TranslationService {
   private let apiKey: String
   private let useFreeAPI: Bool // true = api-free.deepl.com, false = api.deepl.com
 
-  // Rate limiting
+  // Rate limiting - ADAPTIVE
   private let requestQueue: OperationQueue
+  private var minimumRequestInterval: TimeInterval = 0.2 // Start at 0.2s
+  private let maxRequestInterval: TimeInterval = 0.9 // Max
+  private let minRequestInterval: TimeInterval = 0.2 // Min
   private var lastRequestTime: Date = .distantPast
-  private let minimumRequestInterval: TimeInterval = 0.5 // 2 requests/second max
   private let rateLimitQueue = DispatchQueue(label: "com.app.deepl.ratelimit")
 
   init(apiKey: String, useFreeAPI: Bool = true) {
@@ -75,6 +77,8 @@ class TranslationService {
     requestQueue = OperationQueue()
     requestQueue.maxConcurrentOperationCount = 1
     requestQueue.qualityOfService = .userInitiated
+
+    NSLog("[TR:RateLimit] 🟢 Initialized with minimumRequestInterval: \(minimumRequestInterval)s")
   }
 
   // MARK: - Public API
@@ -190,9 +194,7 @@ class TranslationService {
     var fieldMapping: [(fieldType: String, index: Int)] = []
 
     let subjectType = subject.hasRadical ? "Radical" : subject.hasKanji ? "Kanji" : "Vocabulary"
-    NSLog(
-      "[TR:Subject] 🔤 translateSubject() - ID: \(subject.id), Type: \(subjectType)"
-    )
+    NSLog("[TR:Subject] 🔤 translateSubject() - ID: \(subject.id), Type: \(subjectType)")
 
     // Collect Radical fields
     if subject.hasRadical {
@@ -281,12 +283,11 @@ class TranslationService {
         default:
           if fieldType.hasPrefix("vocab_sentence_") {
             if result.vocabularySentenceEnglish.isEmpty {
-              result.vocabularySentenceEnglish = Array(
-                repeating: "", count: subject.vocabulary.sentences.count
-              )
+              result.vocabularySentenceEnglish = Array(repeating: "",
+                                                       count: subject.vocabulary.sentences.count)
             }
-            if let sentenceIndex = Int(fieldType.replacingOccurrences(of: "vocab_sentence_", with: ""))
-            {
+            if let sentenceIndex = Int(fieldType.replacingOccurrences(of: "vocab_sentence_",
+                                                                      with: "")) {
               result.vocabularySentenceEnglish[sentenceIndex] = translatedText
             }
           }
@@ -350,8 +351,22 @@ class TranslationService {
     }
   }
 
+  private func incrementRateLimit() {
+    rateLimitQueue.sync {
+      let newInterval = min(self.minimumRequestInterval + 0.1, self.maxRequestInterval)
+      NSLog("[TR:RateLimit] ⚠️  Rate limited! Increasing interval from \(String(format: "%.1f", self.minimumRequestInterval))s to \(String(format: "%.1f", newInterval))s")
+      self.minimumRequestInterval = newInterval
+    }
+  }
+
   private func performDeepLRequest(texts: [String],
                                    targetLang: TranslationLanguage) -> Promise<[String]> {
+    performDeepLRequest(texts: texts, targetLang: targetLang, retryCount: 0)
+  }
+
+  private func performDeepLRequest(texts: [String],
+                                   targetLang: TranslationLanguage,
+                                   retryCount: Int) -> Promise<[String]> {
     let baseURL = useFreeAPI
       ? "https://api-free.deepl.com/v2/translate"
       : "https://api.deepl.com/v2/translate"
@@ -404,8 +419,22 @@ class TranslationService {
           seal.reject(TranslationError.apiKeyInvalid)
           return
         case 429:
-          NSLog("[TR:API] ❌ Rate limited (429)")
-          seal.reject(TranslationError.invalidResponse)
+          NSLog("[TR:API] ⚠️  Rate limited (429) - attempt \(retryCount + 1)")
+          self.incrementRateLimit()
+
+          // Wait for the new rate limit interval and retry
+          NSLog("[TR:RateLimit] 🔄 Waiting before retry...")
+          DispatchQueue.global().asyncAfter(deadline: .now() + self.minimumRequestInterval) {
+            NSLog("[TR:RateLimit] 🔄 Retrying request...")
+            self.performDeepLRequest(texts: texts, targetLang: targetLang,
+                                     retryCount: retryCount + 1)
+              .done { translatedTexts in
+                seal.fulfill(translatedTexts)
+              }
+              .catch { error in
+                seal.reject(error)
+              }
+          }
           return
         case 456:
           NSLog("[TR:API] ❌ Quota exceeded (456)")
