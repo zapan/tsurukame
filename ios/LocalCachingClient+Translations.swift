@@ -303,23 +303,17 @@ extension LocalCachingClient {
   private func translateSubjectsBatch(subjects: [TKMSubject],
                                       service: TranslationService,
                                       targetLang: TranslationLanguage) -> Promise<Void> {
-    // Translate subjects one by one (could be optimized with batching)
-    var promises: [Promise<Void>] = []
-
-    for subject in subjects {
-      let promise = service.translateSubject(subject: subject, targetLang: targetLang)
-        .done { translatedSubject in
+    service.translateBatchSubjects(subjects: subjects, targetLang: targetLang)
+      .done { translatedSubjects in
+        for translatedSubject in translatedSubjects {
           self.saveTranslation(translation: translatedSubject)
         }
-        .recover { error -> Promise<Void> in
-          NSLog("[TR] Error translating subject \(subject.id): \(error)")
-          // Don't fail the entire batch if one translation fails, return a resolved void promise
-          return .value(())
-        }
-      promises.append(promise)
-    }
-
-    return when(fulfilled: promises)
+      }
+      .recover { error -> Promise<Void> in
+        NSLog("[TR] Error translating batch: \(error)")
+        // Don't fail the entire batch if translation fails, return a resolved void promise
+        return .value(())
+      }
   }
 
   // MARK: - Manual Translation Trigger

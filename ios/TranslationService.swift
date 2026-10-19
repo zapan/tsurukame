@@ -648,14 +648,14 @@ class TranslationService {
           return
         case 429:
           NSLog("[TR:API] ⚠️  Rate limited (429) - attempt \(retryCount + 1)")
-          
+
           // Stop retrying after max attempts
           guard retryCount < self.maxRetryAttempts else {
             NSLog("[TR:API] ❌ Max retries exhausted (\(self.maxRetryAttempts)). Giving up.")
             seal.reject(TranslationError.invalidResponse)
             return
           }
-          
+
           self.incrementRateLimit()
 
           // Wait for the new rate limit interval and retry
