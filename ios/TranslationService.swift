@@ -118,7 +118,8 @@ class TranslationService {
       return Promise.value(Array(repeating: "", count: texts.count))
     }
 
-    NSLog("[TR:API] 📤 Batch request: \(nonEmptyTexts.count) texts, \(nonEmptyTexts.reduce(0) { $0 + $1.count }) chars total")
+    let charCount = nonEmptyTexts.reduce(0) { $0 + $1.count }
+    NSLog("[TR:API] 📤 Batch: \(nonEmptyTexts.count) texts, \(charCount) chars")
 
     return firstly {
       self.waitForRateLimit()
@@ -133,6 +134,127 @@ class TranslationService {
         }
       }
       return result
+    }
+  }
+
+  /// Translate multiple subjects efficiently by batching them together
+  /// Groups texts from multiple subjects into single API requests (max 50 texts, 128kB per request)
+  func translateBatchSubjects(subjects: [TKMSubject],
+                              targetLang: TranslationLanguage) -> Promise<[TKMTranslatedSubject]> {
+    guard !subjects.isEmpty else {
+      return Promise.value([])
+    }
+
+    // Prepare all subjects with their field mappings
+    var allBatches: [(subjectID: UInt32, fieldType: String, text: String)] = []
+
+    for subject in subjects {
+      let subjectType = subject.hasRadical ? "Radical" : subject.hasKanji ? "Kanji" : "Vocabulary"
+      let subjectIDUInt32 = UInt32(truncatingIfNeeded: subject.id)
+
+      // Collect Radical fields
+      if subject.hasRadical {
+        if !subject.radical.mnemonic.isEmpty {
+          allBatches.append((subjectIDUInt32, "radical_mnemonic", subject.radical.mnemonic))
+        }
+        if !subject.radical.deprecatedMnemonic.isEmpty {
+          allBatches.append((subjectIDUInt32, "radical_deprecated_mnemonic",
+                             subject.radical.deprecatedMnemonic))
+        }
+      }
+
+      // Collect Kanji fields
+      if subject.hasKanji {
+        if !subject.kanji.meaningMnemonic.isEmpty {
+          allBatches.append((subjectIDUInt32, "kanji_meaning_mnemonic",
+                             subject.kanji.meaningMnemonic))
+        }
+        if !subject.kanji.meaningHint.isEmpty {
+          allBatches.append((subjectIDUInt32, "kanji_meaning_hint", subject.kanji.meaningHint))
+        }
+        if !subject.kanji.readingMnemonic.isEmpty {
+          allBatches.append((subjectIDUInt32, "kanji_reading_mnemonic",
+                             subject.kanji.readingMnemonic))
+        }
+        if !subject.kanji.readingHint.isEmpty {
+          allBatches.append((subjectIDUInt32, "kanji_reading_hint", subject.kanji.readingHint))
+        }
+      }
+
+      // Collect Vocabulary fields
+      if subject.hasVocabulary {
+        if !subject.vocabulary.meaningExplanation.isEmpty {
+          allBatches.append((subjectIDUInt32, "vocab_meaning_explanation",
+                             subject.vocabulary.meaningExplanation))
+        }
+        if !subject.vocabulary.readingExplanation.isEmpty {
+          allBatches.append((subjectIDUInt32, "vocab_reading_explanation",
+                             subject.vocabulary.readingExplanation))
+        }
+        if !subject.vocabulary.sentences.isEmpty {
+          for (sentenceIndex, sentence) in subject.vocabulary.sentences.enumerated() {
+            allBatches.append((subjectIDUInt32, "vocab_sentence_\(sentenceIndex)",
+                               sentence.english))
+          }
+        }
+      }
+    }
+
+    guard !allBatches.isEmpty else {
+      // No texts to translate, return empty results
+      return Promise.value(subjects.map { subject in
+        var result = TKMTranslatedSubject()
+        result.subjectID = subject.id
+        result.targetLang = targetLang.rawValue
+        result.originalHash = contentHash(subject: subject)
+        result.createdAt = Int32(Date().timeIntervalSince1970)
+        result.updatedAt = Int32(Date().timeIntervalSince1970)
+        result.translationVersion = 1
+        return result
+      })
+    }
+
+    // Split into chunks respecting 50-text and 128kB limits
+    let chunks = splitIntoChunks(batches: allBatches)
+
+    NSLog("[TR:API] 📦 Batch translate \(subjects.count) subjects → \(chunks.count) API request(s)")
+
+    // Translate all chunks sequentially
+    var allTranslatedTexts: [(subjectID: UInt32, fieldType: String, text: String)] = []
+
+    return Promise { seal in
+      var currentChunkIndex = 0
+
+      func translateNextChunk() {
+        guard currentChunkIndex < chunks.count else {
+          // All chunks translated, reconstruct results
+          seal.fulfill(reconstructResults(from: allTranslatedTexts, subjects: subjects,
+                                          targetLang: targetLang))
+          return
+        }
+
+        let chunk = chunks[currentChunkIndex]
+        let textsOnly = chunk.map { $0.text }
+
+        self.waitForRateLimit().then {
+          self.performDeepLRequest(texts: textsOnly, targetLang: targetLang)
+        }.done { translatedTexts in
+          // Map translations back to their metadata
+          for (index, translated) in translatedTexts.enumerated() {
+            if index < chunk.count {
+              allTranslatedTexts.append((chunk[index].subjectID, chunk[index].fieldType,
+                                         translated))
+            }
+          }
+
+          currentChunkIndex += 1
+          translateNextChunk()
+        }.catch { error in
+          seal.reject(error)
+        }
+      }
+
+      translateNextChunk()
     }
   }
 
@@ -298,6 +420,110 @@ class TranslationService {
     }
   }
 
+  // MARK: - Batch Grouping
+
+  /// Split batches into chunks respecting DeepL limits:
+  /// - Maximum 50 texts per request
+  /// - Maximum 128 kB per request
+  private func splitIntoChunks(batches: [(subjectID: UInt32, fieldType: String, text: String)])
+    -> [[(subjectID: UInt32, fieldType: String, text: String)]] {
+    var chunks: [[(subjectID: UInt32, fieldType: String, text: String)]] = []
+    var currentChunk: [(subjectID: UInt32, fieldType: String, text: String)] = []
+    var currentChunkSize = 0
+    let maxTextsPerChunk = 50
+    let maxBytesPerChunk = 128 * 1024 // 128 kB
+
+    for batch in batches {
+      // Estimate the request body size for this text
+      // Each text is encoded as: text=<urlEncoded>&
+      let encodedText = batch.text
+        .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? batch.text
+      let estimatedSize = encodedText.count + 6 // "text=&"
+
+      // Check if adding this text would exceed limits
+      let wouldExceedTextLimit = currentChunk.count >= maxTextsPerChunk
+      let wouldExceedSizeLimit = (currentChunkSize + estimatedSize) > maxBytesPerChunk
+
+      if !currentChunk.isEmpty, wouldExceedTextLimit || wouldExceedSizeLimit {
+        // Start a new chunk
+        chunks.append(currentChunk)
+        currentChunk = []
+        currentChunkSize = 0
+      }
+
+      currentChunk.append(batch)
+      currentChunkSize += estimatedSize
+    }
+
+    // Add the last chunk if not empty
+    if !currentChunk.isEmpty {
+      chunks.append(currentChunk)
+    }
+
+    return chunks
+  }
+
+  /// Reconstruct TKMTranslatedSubject results from translated texts
+  private func reconstructResults(from translatedBatches: [(subjectID: UInt32, fieldType: String,
+                                                            text: String)],
+                                  subjects: [TKMSubject],
+                                  targetLang: TranslationLanguage) -> [TKMTranslatedSubject] {
+    // Group translated texts by subject ID
+    var translationsBySubject: [UInt32: [String: String]] = [:]
+    for batch in translatedBatches {
+      if translationsBySubject[batch.subjectID] == nil {
+        translationsBySubject[batch.subjectID] = [:]
+      }
+      translationsBySubject[batch.subjectID]![batch.fieldType] = batch.text
+    }
+
+    // Reconstruct results for each subject
+    return subjects.map { subject in
+      var result = TKMTranslatedSubject()
+      result.subjectID = subject.id
+      result.targetLang = targetLang.rawValue
+      result.originalHash = contentHash(subject: subject)
+      result.createdAt = Int32(Date().timeIntervalSince1970)
+      result.updatedAt = Int32(Date().timeIntervalSince1970)
+      result.translationVersion = 1
+
+      let subjectIDUInt32 = UInt32(truncatingIfNeeded: subject.id)
+      guard let translations = translationsBySubject[subjectIDUInt32] else {
+        return result
+      }
+
+      // Map translations back to fields
+      if subject.hasRadical {
+        result.radicalMnemonic = translations["radical_mnemonic"] ?? ""
+        result.radicalDeprecatedMnemonic = translations["radical_deprecated_mnemonic"] ?? ""
+      }
+
+      if subject.hasKanji {
+        result.kanjiMeaningMnemonic = translations["kanji_meaning_mnemonic"] ?? ""
+        result.kanjiMeaningHint = translations["kanji_meaning_hint"] ?? ""
+        result.kanjiReadingMnemonic = translations["kanji_reading_mnemonic"] ?? ""
+        result.kanjiReadingHint = translations["kanji_reading_hint"] ?? ""
+      }
+
+      if subject.hasVocabulary {
+        result.vocabularyMeaningExplanation = translations["vocab_meaning_explanation"] ?? ""
+        result.vocabularyReadingExplanation = translations["vocab_reading_explanation"] ?? ""
+
+        // Reconstruct sentence translations
+        var sentenceTranslations: [String] = []
+        for sentenceIndex in 0 ..< subject.vocabulary.sentences.count {
+          let key = "vocab_sentence_\(sentenceIndex)"
+          sentenceTranslations.append(translations[key] ?? "")
+        }
+        if !sentenceTranslations.isEmpty {
+          result.vocabularySentenceEnglish = sentenceTranslations
+        }
+      }
+
+      return result
+    }
+  }
+
   // MARK: - Content Hashing
 
   /// Calculate a hash of the translatable content in a subject
@@ -393,8 +619,9 @@ class TranslationService {
 
     request.httpBody = bodyComponents.joined(separator: "&").data(using: .utf8)
     let requestBodySize = request.httpBody?.count ?? 0
+    let requestBodySizeKB = Double(requestBodySize) / 1024.0
 
-    NSLog("[TR:API] 🚀 DeepL: \(texts.count) texts → \(requestBodySize) bytes")
+    NSLog("[TR:API] 🚀 DeepL Request: \(texts.count) texts, \(requestBodySize) bytes (\(String(format: "%.2f", requestBodySizeKB)) kB)")
 
     return Promise { seal in
       let task = URLSession.shared.dataTask(with: request) { data, response, error in
