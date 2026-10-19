@@ -114,6 +114,8 @@ class TranslationService {
       return Promise.value(Array(repeating: "", count: texts.count))
     }
 
+    NSLog("[TR:API] 📤 Batch request: \(nonEmptyTexts.count) texts, \(nonEmptyTexts.reduce(0) { $0 + $1.count }) chars total")
+
     return firstly {
       self.waitForRateLimit()
     }.then { _ in
@@ -124,7 +126,6 @@ class TranslationService {
       for (translatedIndex, originalIndex) in textIndexMap {
         if translatedIndex < translatedTexts.count {
           result[originalIndex] = translatedTexts[translatedIndex]
-          NSLog("[TR] DeepL API translatedText: \(result[originalIndex])")
         }
       }
       return result
@@ -173,7 +174,7 @@ class TranslationService {
     }
   }
 
-  /// Translate a complete subject with all its fields
+  /// Translate a complete subject with all its fields (OPTIMIZED BATCH)
   func translateSubject(subject: TKMSubject,
                         targetLang: TranslationLanguage) -> Promise<TKMTranslatedSubject> {
     var result = TKMTranslatedSubject()
@@ -182,89 +183,118 @@ class TranslationService {
     result.originalHash = contentHash(subject: subject)
     result.createdAt = Int32(Date().timeIntervalSince1970)
     result.updatedAt = Int32(Date().timeIntervalSince1970)
-    result.translationVersion = 1 // Version 1 of our translation algorithm
+    result.translationVersion = 1
 
-    var promises: [Promise<Void>] = []
+    // Collect all texts to translate with metadata about what they are
+    var textsToTranslate: [String] = []
+    var fieldMapping: [(fieldType: String, index: Int)] = []
 
-    // Translate Radical fields
+    let subjectType = subject.hasRadical ? "Radical" : subject.hasKanji ? "Kanji" : "Vocabulary"
+    NSLog(
+      "[TR:Subject] 🔤 translateSubject() - ID: \(subject.id), Type: \(subjectType)"
+    )
+
+    // Collect Radical fields
     if subject.hasRadical {
       if !subject.radical.mnemonic.isEmpty {
-        promises.append(translateWithMarkup(text: subject.radical.mnemonic, targetLang: targetLang)
-          .done { result.radicalMnemonic = $0 })
+        textsToTranslate.append(subject.radical.mnemonic)
+        fieldMapping.append(("radical_mnemonic", textsToTranslate.count - 1))
       }
-
       if !subject.radical.deprecatedMnemonic.isEmpty {
-        promises.append(translateWithMarkup(text: subject.radical.deprecatedMnemonic,
-                                            targetLang: targetLang)
-            .done { result.radicalDeprecatedMnemonic = $0 })
+        textsToTranslate.append(subject.radical.deprecatedMnemonic)
+        fieldMapping.append(("radical_deprecated_mnemonic", textsToTranslate.count - 1))
       }
     }
 
-    // Translate Kanji fields
+    // Collect Kanji fields
     if subject.hasKanji {
-      // meaning_mnemonic: always translate directly
       if !subject.kanji.meaningMnemonic.isEmpty {
-        promises.append(translateWithMarkup(text: subject.kanji.meaningMnemonic,
-                                            targetLang: targetLang)
-            .done { result.kanjiMeaningMnemonic = $0 })
+        textsToTranslate.append(subject.kanji.meaningMnemonic)
+        fieldMapping.append(("kanji_meaning_mnemonic", textsToTranslate.count - 1))
       }
-
-      // meaning_hint: always translate directly
       if !subject.kanji.meaningHint.isEmpty {
-        promises.append(translateWithMarkup(text: subject.kanji.meaningHint, targetLang: targetLang)
-          .done { result.kanjiMeaningHint = $0 })
+        textsToTranslate.append(subject.kanji.meaningHint)
+        fieldMapping.append(("kanji_meaning_hint", textsToTranslate.count - 1))
       }
-
-      // reading_mnemonic: check phonetics
       if !subject.kanji.readingMnemonic.isEmpty {
-        let primaryReading = subject.readings.first?.reading ?? ""
-        promises.append(translateReadingMnemonic(text: subject.kanji.readingMnemonic,
-                                                 reading: primaryReading,
-                                                 targetLang: targetLang).done { translationResult in
-            result.kanjiReadingMnemonic = translationResult.text
-            result.readingMnemonicUsesEnglish = translationResult.usesEnglish
-          })
+        textsToTranslate.append(subject.kanji.readingMnemonic)
+        fieldMapping.append(("kanji_reading_mnemonic", textsToTranslate.count - 1))
       }
-
-      // reading_hint: translate directly (usually no phonetic issues)
       if !subject.kanji.readingHint.isEmpty {
-        promises.append(translateWithMarkup(text: subject.kanji.readingHint, targetLang: targetLang)
-          .done { result.kanjiReadingHint = $0 })
+        textsToTranslate.append(subject.kanji.readingHint)
+        fieldMapping.append(("kanji_reading_hint", textsToTranslate.count - 1))
       }
     }
 
-    // Translate Vocabulary fields
+    // Collect Vocabulary fields
     if subject.hasVocabulary {
-      // meaning_explanation: always translate directly
       if !subject.vocabulary.meaningExplanation.isEmpty {
-        promises.append(translateWithMarkup(text: subject.vocabulary.meaningExplanation,
-                                            targetLang: targetLang)
-            .done { result.vocabularyMeaningExplanation = $0 })
+        textsToTranslate.append(subject.vocabulary.meaningExplanation)
+        fieldMapping.append(("vocab_meaning_explanation", textsToTranslate.count - 1))
       }
-
-      // reading_explanation: check phonetics
       if !subject.vocabulary.readingExplanation.isEmpty {
-        let primaryReading = subject.readings.first?.reading ?? ""
-        promises.append(translateReadingMnemonic(text: subject.vocabulary.readingExplanation,
-                                                 reading: primaryReading,
-                                                 targetLang: targetLang).done { translationResult in
-            result.vocabularyReadingExplanation = translationResult.text
-            result.readingExplanationUsesEnglish = translationResult.usesEnglish
-          })
+        textsToTranslate.append(subject.vocabulary.readingExplanation)
+        fieldMapping.append(("vocab_reading_explanation", textsToTranslate.count - 1))
       }
-
-      // context sentences: translate all
       if !subject.vocabulary.sentences.isEmpty {
         let englishSentences = subject.vocabulary.sentences.map { $0.english }
-        promises.append(translateBatch(texts: englishSentences, targetLang: targetLang)
-          .done { translated in
-            result.vocabularySentenceEnglish = translated
-          })
+        for (sentenceIndex, sentence) in englishSentences.enumerated() {
+          textsToTranslate.append(sentence)
+          fieldMapping.append(("vocab_sentence_\(sentenceIndex)", textsToTranslate.count - 1))
+        }
       }
     }
 
-    // Wait for all translations to complete
-    return when(fulfilled: promises).map { _ in result }
+    guard !textsToTranslate.isEmpty else {
+      NSLog("[TR:Subject] ⚠️  No texts to translate for subject \(subject.id)")
+      return Promise.value(result)
+    }
+
+    NSLog("[TR:Subject] 📊 Batching \(textsToTranslate.count) texts in single request")
+
+    // Now translate ALL texts in a single batch
+    return translateBatch(texts: textsToTranslate, targetLang: targetLang).then { translatedTexts
+      -> Promise<TKMTranslatedSubject> in
+
+      // Map results back to fields
+      for (fieldType, index) in fieldMapping {
+        guard index < translatedTexts.count else { continue }
+        let translatedText = translatedTexts[index]
+
+        switch fieldType {
+        case "radical_mnemonic":
+          result.radicalMnemonic = translatedText
+        case "radical_deprecated_mnemonic":
+          result.radicalDeprecatedMnemonic = translatedText
+        case "kanji_meaning_mnemonic":
+          result.kanjiMeaningMnemonic = translatedText
+        case "kanji_meaning_hint":
+          result.kanjiMeaningHint = translatedText
+        case "kanji_reading_mnemonic":
+          result.kanjiReadingMnemonic = translatedText
+        case "kanji_reading_hint":
+          result.kanjiReadingHint = translatedText
+        case "vocab_meaning_explanation":
+          result.vocabularyMeaningExplanation = translatedText
+        case "vocab_reading_explanation":
+          result.vocabularyReadingExplanation = translatedText
+        default:
+          if fieldType.hasPrefix("vocab_sentence_") {
+            if result.vocabularySentenceEnglish.isEmpty {
+              result.vocabularySentenceEnglish = Array(
+                repeating: "", count: subject.vocabulary.sentences.count
+              )
+            }
+            if let sentenceIndex = Int(fieldType.replacingOccurrences(of: "vocab_sentence_", with: ""))
+            {
+              result.vocabularySentenceEnglish[sentenceIndex] = translatedText
+            }
+          }
+        }
+      }
+
+      return Promise.value(result)
+    }
   }
 
   // MARK: - Content Hashing
@@ -347,15 +377,20 @@ class TranslationService {
     bodyComponents.append("split_sentences=0") // Don't split sentences
 
     request.httpBody = bodyComponents.joined(separator: "&").data(using: .utf8)
+    let requestBodySize = request.httpBody?.count ?? 0
+
+    NSLog("[TR:API] 🚀 DeepL: \(texts.count) texts → \(requestBodySize) bytes")
 
     return Promise { seal in
       let task = URLSession.shared.dataTask(with: request) { data, response, error in
         if let error = error {
+          NSLog("[TR:API] ❌ Network error: \(error.localizedDescription)")
           seal.reject(TranslationError.networkError(error))
           return
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+          NSLog("[TR:API] ❌ Invalid response type")
           seal.reject(TranslationError.invalidResponse)
           return
         }
@@ -363,24 +398,27 @@ class TranslationService {
         // Check for API errors
         switch httpResponse.statusCode {
         case 200:
-          break // Success
+          break // Success, continue to parsing
         case 403:
+          NSLog("[TR:API] ❌ API Key Invalid (403)")
           seal.reject(TranslationError.apiKeyInvalid)
           return
         case 429:
-          NSLog("[TR] DeepL API error: Too Many Requests (429)")
+          NSLog("[TR:API] ❌ Rate limited (429)")
           seal.reject(TranslationError.invalidResponse)
           return
         case 456:
+          NSLog("[TR:API] ❌ Quota exceeded (456)")
           seal.reject(TranslationError.quotaExceeded)
           return
         default:
-          NSLog("[TR] DeepL API error: Status code \(httpResponse.statusCode)")
+          NSLog("[TR:API] ❌ HTTP \(httpResponse.statusCode)")
           seal.reject(TranslationError.invalidResponse)
           return
         }
 
         guard let data = data else {
+          NSLog("[TR:API] ❌ No data in response")
           seal.reject(TranslationError.invalidResponse)
           return
         }
@@ -389,6 +427,7 @@ class TranslationService {
         do {
           guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                 let translations = json["translations"] as? [[String: Any]] else {
+            NSLog("[TR:API] ❌ Invalid JSON structure")
             seal.reject(TranslationError.invalidResponse)
             return
           }
@@ -398,12 +437,15 @@ class TranslationService {
           }
 
           guard translatedTexts.count == texts.count else {
+            NSLog("[TR:API] ❌ Count mismatch: sent \(texts.count), got \(translatedTexts.count)")
             seal.reject(TranslationError.invalidResponse)
             return
           }
 
+          NSLog("[TR:API] ✅ HTTP 200 - Received \(translatedTexts.count) translations")
           seal.fulfill(translatedTexts)
         } catch {
+          NSLog("[TR:API] ❌ JSON parsing error: \(error.localizedDescription)")
           seal.reject(TranslationError.invalidResponse)
         }
       }
@@ -452,8 +494,10 @@ class TranslationService {
 
     // Sort by key to process in consistent order
     let sortedKeys = tagMap.keys.sorted { key1, key2 in
-      let num1 = Int(key1.replacingOccurrences(of: "TAG_", with: "").replacingOccurrences(of: "_START", with: "")) ?? 0
-      let num2 = Int(key2.replacingOccurrences(of: "TAG_", with: "").replacingOccurrences(of: "_START", with: "")) ?? 0
+      let num1 = Int(key1.replacingOccurrences(of: "TAG_", with: "")
+        .replacingOccurrences(of: "_START", with: "")) ?? 0
+      let num2 = Int(key2.replacingOccurrences(of: "TAG_", with: "")
+        .replacingOccurrences(of: "_START", with: "")) ?? 0
       return num1 < num2
     }
 
