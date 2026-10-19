@@ -57,6 +57,16 @@ struct TranslationResult {
   let usesEnglish: Bool // true if fallback was used
 }
 
+struct DeepLUsage {
+  let characterCount: Int
+  let characterLimit: Int
+  let usagePercentage: Double
+
+  var remainingCharacters: Int {
+    characterLimit - characterCount
+  }
+}
+
 class TranslationService {
   private let apiKey: String
   private let useFreeAPI: Bool // true = api-free.deepl.com, false = api.deepl.com
@@ -272,6 +282,77 @@ class TranslationService {
     return translate(text: plainText, targetLang: targetLang).map { translated in
       // Restore tags in the translated text
       self.restoreTags(in: translated, using: tagMap)
+    }
+  }
+
+  /// Fetch current usage information from DeepL API
+  func fetchUsage() -> Promise<DeepLUsage> {
+    let baseURL = useFreeAPI
+      ? "https://api-free.deepl.com/v2/usage"
+      : "https://api.deepl.com/v2/usage"
+
+    guard let url = URL(string: baseURL) else {
+      return Promise(error: TranslationError.invalidResponse)
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.setValue("DeepL-Auth-Key \(apiKey)", forHTTPHeaderField: "Authorization")
+
+    NSLog("[TR:Usage] 📊 Fetching usage information from DeepL API")
+
+    return Promise { seal in
+      let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        if let error = error {
+          NSLog("[TR:Usage] ❌ Network error: \(error.localizedDescription)")
+          seal.reject(TranslationError.networkError(error))
+          return
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+          NSLog("[TR:Usage] ❌ Invalid response type")
+          seal.reject(TranslationError.invalidResponse)
+          return
+        }
+
+        guard httpResponse.statusCode == 200 else {
+          NSLog("[TR:Usage] ❌ HTTP \(httpResponse.statusCode)")
+          seal.reject(TranslationError.invalidResponse)
+          return
+        }
+
+        guard let data = data else {
+          NSLog("[TR:Usage] ❌ No data in response")
+          seal.reject(TranslationError.invalidResponse)
+          return
+        }
+
+        // Parse JSON response
+        do {
+          guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            NSLog("[TR:Usage] ❌ Invalid JSON structure")
+            seal.reject(TranslationError.invalidResponse)
+            return
+          }
+
+          let characterCount = json["character_count"] as? Int ?? 0
+          let characterLimit = json["character_limit"] as? Int ?? 0
+
+          let usage = DeepLUsage(characterCount: characterCount,
+                                 characterLimit: characterLimit,
+                                 usagePercentage: characterLimit > 0 ? Double(characterCount) /
+                                   Double(characterLimit) *
+                                   100 : 0)
+
+          NSLog("[TR:Usage] ✅ Usage: \(characterCount)/\(characterLimit) characters (\(String(format: "%.1f", usage.usagePercentage))%)")
+          seal.fulfill(usage)
+        } catch {
+          NSLog("[TR:Usage] ❌ JSON parsing error: \(error.localizedDescription)")
+          seal.reject(TranslationError.invalidResponse)
+        }
+      }
+
+      task.resume()
     }
   }
 
@@ -673,8 +754,17 @@ class TranslationService {
           }
           return
         case 456:
-          NSLog("[TR:API] ❌ Quota exceeded (456)")
-          seal.reject(TranslationError.quotaExceeded)
+          NSLog("[TR:API] ❌ Quota exceeded (456) - Fetching usage details...")
+          // Fetch detailed usage information before rejecting
+          self.fetchUsage().done { usage in
+            NSLog("[TR:API] ❌ Quota exceeded (456)")
+            NSLog("[TR:API] 📊 Usage: \(usage.characterCount)/\(usage.characterLimit) characters (\(String(format: "%.1f", usage.usagePercentage))%)")
+            NSLog("[TR:API] 📊 Remaining: \(usage.remainingCharacters) characters")
+            seal.reject(TranslationError.quotaExceeded)
+          }.catch { _ in
+            NSLog("[TR:API] ❌ Quota exceeded (456)")
+            seal.reject(TranslationError.quotaExceeded)
+          }
           return
         default:
           NSLog("[TR:API] ❌ HTTP \(httpResponse.statusCode)")
