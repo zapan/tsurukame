@@ -152,14 +152,6 @@ class TranslationSettingsViewController: UITableViewController {
         model.add(section: "Maintenance")
 
         model.add(BasicModelItem(style: .default,
-                                 title: "Repair Reading Tags",
-                                 subtitle: "Fix reading tags in existing translations",
-                                 accessoryType: .disclosureIndicator,
-                                 tapHandler: { [weak self] in
-                                   self?.repairReadingTags()
-                                 }))
-
-        model.add(BasicModelItem(style: .default,
                                  title: "Clear All Translations",
                                  subtitle: nil,
                                  accessoryType: .none,
@@ -305,49 +297,5 @@ class TranslationSettingsViewController: UITableViewController {
                                   preferredStyle: .alert)
     alert.addAction(UIAlertAction(title: "OK", style: .default))
     present(alert, animated: true)
-  }
-
-  private func repairReadingTags() {
-    let alert = UIAlertController(title: "Repair Reading Tags",
-                                  message: "This will fix reading tags in translations that were broken by DeepL. " +
-                                    "The tag <reading> will contain romaji instead of the translated word.",
-                                  preferredStyle: .alert)
-
-    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-    alert.addAction(UIAlertAction(title: "Repair", style: .default) { [weak self] _ in
-      self?.performRepair()
-    })
-
-    present(alert, animated: true)
-  }
-
-  private func performRepair() {
-    // Show progress HUD
-    let hud = UIAlertController(title: "Repairing...", message: "0 / 0", preferredStyle: .alert)
-    present(hud, animated: true)
-
-    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-      guard let self = self else { return }
-
-      self.services.localCachingClient
-        .repairReadingTagsInTranslations(targetLang: Settings.translationLanguage
-          .rawValue) { current, total in
-            DispatchQueue.main.async {
-              hud.message = "\(current) / \(total)"
-            }
-        }
-
-      DispatchQueue.main.async {
-        hud.dismiss(animated: true) {
-          self.rerender()
-
-          let successAlert = UIAlertController(title: "Complete",
-                                               message: "Reading tags have been repaired successfully!",
-                                               preferredStyle: .alert)
-          successAlert.addAction(UIAlertAction(title: "OK", style: .default))
-          self.present(successAlert, animated: true)
-        }
-      }
-    }
   }
 }
