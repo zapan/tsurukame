@@ -116,7 +116,7 @@ class LevelSelectorViewController: UIViewController {
       buttonStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
       buttonStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
       buttonStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-      buttonStack.heightAnchor.constraint(equalToConstant: 44),
+      buttonStack.heightAnchor.constraint(equalToConstant: 24),
     ])
   }
 
