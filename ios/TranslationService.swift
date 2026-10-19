@@ -65,7 +65,8 @@ class TranslationService {
   private let requestQueue: OperationQueue
   private var minimumRequestInterval: TimeInterval = 0.2 // Start at 0.2s
   private let maxRequestInterval: TimeInterval = 0.9 // Max
-  private let minRequestInterval: TimeInterval = 0.2 // Min
+  private let minRequestInterval: TimeInterval = 0.2 // Min 0.2s
+  private let maxRetryAttempts: Int = 3 // Max retries before giving up
   private var lastRequestTime: Date = .distantPast
   private let rateLimitQueue = DispatchQueue(label: "com.app.deepl.ratelimit")
 
@@ -647,6 +648,14 @@ class TranslationService {
           return
         case 429:
           NSLog("[TR:API] ⚠️  Rate limited (429) - attempt \(retryCount + 1)")
+          
+          // Stop retrying after max attempts
+          guard retryCount < self.maxRetryAttempts else {
+            NSLog("[TR:API] ❌ Max retries exhausted (\(self.maxRetryAttempts)). Giving up.")
+            seal.reject(TranslationError.invalidResponse)
+            return
+          }
+          
           self.incrementRateLimit()
 
           // Wait for the new rate limit interval and retry
