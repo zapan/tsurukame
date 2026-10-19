@@ -450,21 +450,40 @@ class TranslationService {
                            using tagMap: [String: (tag: String, content: String)]) -> String {
     var result = text
 
-    for (key, value) in tagMap {
+    // Sort by key to process in consistent order
+    let sortedKeys = tagMap.keys.sorted { key1, key2 in
+      let num1 = Int(key1.replacingOccurrences(of: "TAG_", with: "").replacingOccurrences(of: "_START", with: "")) ?? 0
+      let num2 = Int(key2.replacingOccurrences(of: "TAG_", with: "").replacingOccurrences(of: "_START", with: "")) ?? 0
+      return num1 < num2
+    }
+
+    for key in sortedKeys {
+      guard let value = tagMap[key] else { continue }
+
       let startPlaceholder = "{{\(key)_START}}"
       let endPlaceholder = "{{\(key)_END}}"
 
       // Find the translated content between placeholders
-      if let startRange = result.range(of: startPlaceholder),
-         let endRange = result.range(of: endPlaceholder) {
-        let contentRange = startRange.upperBound ..< endRange.lowerBound
-        let translatedContent = String(result[contentRange])
-        let fullRange = startRange.lowerBound ..< endRange.upperBound
-
-        // Replace with the original tag
-        let replacement = "<\(value.tag)>\(translatedContent)</\(value.tag)>"
-        result.replaceSubrange(fullRange, with: replacement)
+      guard let startRange = result.range(of: startPlaceholder),
+            let endRange = result.range(of: endPlaceholder) else {
+        // Placeholders not found - log warning but continue
+        NSLog("[TR] Warning: Placeholders not found for key: \(key)")
+        continue
       }
+
+      // Verify valid range before creating it
+      guard startRange.upperBound <= endRange.lowerBound else {
+        NSLog("[TR] Error: Invalid range order for key: \(key). Start: \(startRange.upperBound), End: \(endRange.lowerBound)")
+        continue
+      }
+
+      let contentRange = startRange.upperBound ..< endRange.lowerBound
+      let translatedContent = String(result[contentRange])
+      let fullRange = startRange.lowerBound ..< endRange.upperBound
+
+      // Replace with the original tag
+      let replacement = "<\(value.tag)>\(translatedContent)</\(value.tag)>"
+      result.replaceSubrange(fullRange, with: replacement)
     }
 
     return result
