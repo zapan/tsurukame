@@ -318,3 +318,121 @@ async def get_summary(request: Request):
         response["data"]["reviews"] = review_count
     
     return response
+
+@router.get("/study_materials")
+async def get_study_materials(request: Request):
+    """Get study materials (proxied)"""
+    path = "/study_materials"
+    return await proxy_request(request, path)
+
+@router.get("/level_progressions")
+async def get_level_progressions():
+    """Get level progressions (custom - based on local progress)"""
+    user_info = get_user_info()
+    current_level = user_info.get("level", 1)
+    
+    # Calculate level percentage based on completed items
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Count items at current level
+    cursor.execute("""
+        SELECT COUNT(*) as total
+        FROM assignments
+        WHERE level = ?
+    """, (current_level,))
+    
+    total = cursor.fetchone()["total"]
+    
+    # Count passed items at current level
+    cursor.execute("""
+        SELECT COUNT(*) as passed
+        FROM assignments
+        WHERE level = ? AND passed_at IS NOT NULL
+    """, (current_level,))
+    
+    passed = cursor.fetchone()["passed"]
+    
+    conn.close()
+    
+    # Calculate percentage
+    percentage = int((passed / total * 100)) if total > 0 else 0
+    
+    return {
+        "object": "collection",
+        "url": "/v2/level_progressions",
+        "pages": {
+            "per_page": 500,
+            "next_url": None,
+            "previous_url": None
+        },
+        "total_count": 1,
+        "data": [
+            {
+                "id": current_level,
+                "object": "level_progression",
+                "url": f"/v2/level_progressions/{current_level}",
+                "data": {
+                    "level": current_level,
+                    "started_at": user_info.get("started_at"),
+                    "unlocked_at": user_info.get("started_at"),
+                    "completed_at": None,
+                    "abandoned_at": None,
+                    "passed_at": None if percentage < 100 else datetime.utcnow().isoformat(),
+                    "percentage": percentage
+                }
+            }
+        ]
+    }
+
+@router.get("/voice_actors")
+async def get_voice_actors(request: Request):
+    """Get voice actors (proxied)"""
+    path = "/voice_actors"
+    return await proxy_request(request, path)
+
+@router.get("/review_statistics")
+async def get_review_statistics():
+    """Get review statistics (custom - based on local database)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT * FROM review_statistics
+    """)
+    
+    stats = []
+    for row in cursor.fetchall():
+        stats.append({
+            "id": row["subject_id"],
+            "object": "review_statistic",
+            "url": f"/v2/review_statistics/{row['subject_id']}",
+            "data": {
+                "created_at": row["created_at"],
+                "subject_id": row["subject_id"],
+                "subject_type": row["subject_type"],
+                "meaning_correct": row["meaning_correct"],
+                "meaning_incorrect": row["meaning_incorrect"],
+                "meaning_current_streak": row["meaning_current_streak"],
+                "meaning_max_streak": row["meaning_max_streak"],
+                "reading_correct": row["reading_correct"],
+                "reading_incorrect": row["reading_incorrect"],
+                "reading_current_streak": row["reading_current_streak"],
+                "reading_max_streak": row["reading_max_streak"],
+                "percentage": 0  # Calculate if needed
+            }
+        })
+    
+    conn.close()
+    
+    return {
+        "object": "collection",
+        "url": "/v2/review_statistics",
+        "pages": {
+            "per_page": 500,
+            "next_url": None,
+            "previous_url": None
+        },
+        "total_count": len(stats),
+        "data": stats
+    }
