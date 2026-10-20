@@ -206,12 +206,14 @@ class TranslationSettingsViewController: UITableViewController {
     let userLevel = services.localCachingClient.getUserInfo()?.level ?? 1
     let maxLevel = services.localCachingClient.maxLevelGrantedBySubscription
 
-    let levelSelector = LevelSelectorViewController(currentLevel: userLevel,
-                                                    maxLevel: Int32(maxLevel),
-                                                    onSelect: { [weak self] selectedLevel in
-                                                      self?
-                                                        .performManualTranslation(upToLevel: selectedLevel)
-                                                    })
+    let levelSelector = TranslationLevelSelectorViewController(currentLevel: userLevel,
+                                                               maxLevel: Int32(maxLevel),
+                                                               onSelect: { [
+                                                                 weak self
+                                                               ] selectedLevel in
+                                                                 self?
+                                                                   .performManualTranslation(upToLevel: selectedLevel)
+                                                               })
 
     present(levelSelector, animated: true)
   }

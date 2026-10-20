@@ -14,7 +14,7 @@
 
 import UIKit
 
-class LevelSelectorViewController: UIViewController {
+class TranslationLevelSelectorViewController: UIViewController {
   private let currentLevel: Int32
   private let maxLevel: Int32
   private let onSelect: (Int32) -> Void
