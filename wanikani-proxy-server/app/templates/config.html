@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wanikani Proxy - Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .info {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 12px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        .info a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+        
+        .info a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wanikani Proxy Configuration</h1>
+        <p class="subtitle">Configure your Wanikani API key to enable the proxy server</p>
+        
+        <div class="form-group">
+            <label for="api_key">Wanikani API Key</label>
+            <input 
+                type="text" 
+                id="api_key" 
+                placeholder="Enter your API key here"
+                {% if api_key_configured %}
+                    value="••••••••••••••••"
+                {% endif %}
+            >
+        </div>
+        
+        <button onclick="saveConfig()">Save Configuration</button>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="info">
+            <strong>How to get your API key:</strong><br>
+            Go to <a href="https://www.wanikani.com/settings/personal_access_tokens" target="_blank">Wanikani Settings → Personal Access Tokens</a> and create a new token.
+        </div>
+    </div>
+    
+    <script>
+        async function saveConfig() {
+            const apiKey = document.getElementById('api_key').value;
+            const statusDiv = document.getElementById('status');
+            
+            // Don't send if it's just the placeholder
+            if (apiKey === '••••••••••••••••') {
+                statusDiv.textContent = 'Please enter your API key';
+                statusDiv.className = 'status error';
+                statusDiv.style.display = 'block';
+                return;
+            }
+            
+            statusDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.textContent = data.message;
+                    statusDiv.className = 'status success';
+                    statusDiv.style.display = 'block';
+                    document.getElementById('api_key').value = '••••••••••••••••';
+                } else {
+                    statusDiv.textContent = data.detail || 'Error saving configuration';
+                    statusDiv.className = 'status error';
+                    statusDiv.style.display = 'block';
+                }
+            } catch (error) {
+                statusDiv.textContent = 'Error: ' + error.message;
+                statusDiv.className = 'status error';
+                statusDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
