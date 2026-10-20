@@ -75,21 +75,74 @@ async def get_subject(subject_id: int, request: Request):
 
 @router.get("/assignments")
 async def get_assignments(request: Request):
-    """Get assignments (proxied and filtered by level 1)"""
-    # Proxy the request to Wanikani
-    path = "/assignments"
-    response = await proxy_request(request, path)
+    """Get assignments (custom - create level 1 assignments from subjects)"""
+    # First, get level 1 subjects
+    subjects_path = "/subjects"
+    subjects_response = await proxy_request(request, subjects_path)
     
-    # Filter assignments to only show level 1
-    if "data" in response:
-        filtered_data = [
-            assignment for assignment in response["data"]
-            if assignment["data"]["level"] == 1
+    level_1_subjects = []
+    if "data" in subjects_response:
+        level_1_subjects = [
+            subject for subject in subjects_response["data"]
+            if subject["data"]["level"] == 1
         ]
-        response["data"] = filtered_data
-        response["total_count"] = len(filtered_data)
     
-    return response
+    # Get existing assignments from Wanikani
+    assignments_path = "/assignments"
+    assignments_response = await proxy_request(request, assignments_path)
+    
+    # Create assignments for level 1 subjects that don't have one
+    existing_subject_ids = set()
+    if "data" in assignments_response:
+        existing_subject_ids = set(
+            a["data"]["subject_id"] for a in assignments_response["data"]
+            if a["data"].get("level") == 1
+        )
+    
+    # Create new assignments for subjects without one
+    new_assignments = []
+    for subject in level_1_subjects:
+        subject_id = subject["id"]
+        subject_type = subject["object"]
+        
+        if subject_id not in existing_subject_ids:
+            new_assignments.append({
+                "id": subject_id * -1,  # Negative ID to distinguish from real assignments
+                "object": "assignment",
+                "url": f"/v2/assignments/{subject_id * -1}",
+                "data": {
+                    "created_at": datetime.utcnow().isoformat(),
+                    "subject_id": subject_id,
+                    "subject_type": subject_type,
+                    "level": 1,
+                    "srs_stage": 0,  # initiate
+                    "available_at": datetime.utcnow().isoformat(),  # Immediately available
+                    "started_at": None,
+                    "passed_at": None
+                }
+            })
+    
+    # Combine filtered existing assignments with new ones
+    filtered_existing = []
+    if "data" in assignments_response:
+        filtered_existing = [
+            assignment for assignment in assignments_response["data"]
+            if assignment["data"].get("level") == 1
+        ]
+    
+    all_assignments = filtered_existing + new_assignments
+    
+    return {
+        "object": "collection",
+        "url": "/v2/assignments",
+        "pages": {
+            "per_page": 500,
+            "next_url": None,
+            "previous_url": None
+        },
+        "total_count": len(all_assignments),
+        "data": all_assignments
+    }
 
 @router.get("/reviews")
 async def get_reviews(request: Request):
@@ -256,18 +309,16 @@ async def get_voice_actors(request: Request):
 
 @router.get("/review_statistics")
 async def get_review_statistics(request: Request):
-    """Get review statistics (proxied and filtered by level 1)"""
-    # Proxy the request to Wanikani
-    path = "/review_statistics"
-    response = await proxy_request(request, path)
-    
-    # Filter statistics to only show level 1
-    if "data" in response:
-        filtered_data = [
-            stat for stat in response["data"]
-            if stat["data"]["level"] == 1
-        ]
-        response["data"] = filtered_data
-        response["total_count"] = len(filtered_data)
-    
-    return response
+    """Get review statistics (proxied - return empty for level 1 reset)"""
+    # For now, return empty statistics since we're resetting to level 1
+    return {
+        "object": "collection",
+        "url": "/v2/review_statistics",
+        "pages": {
+            "per_page": 500,
+            "next_url": None,
+            "previous_url": None
+        },
+        "total_count": 0,
+        "data": []
+    }
