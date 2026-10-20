@@ -1,18 +1,8 @@
 import sqlite3
-import os
-from cryptography.fernet import Fernet
-import base64
-import hashlib
 from pathlib import Path
 
 # Database path
 DB_PATH = Path(__file__).parent.parent / "wanikani_proxy.db"
-
-# Encryption key (derived from a fixed salt - in production use proper key management)
-SALT = b"wanikani_proxy_salt"
-KEY = hashlib.sha256(SALT).digest()[:32]
-FERNET_KEY = base64.urlsafe_b64encode(KEY)
-cipher = Fernet(FERNET_KEY)
 
 def get_db_connection():
     """Get database connection"""
@@ -24,14 +14,6 @@ def init_db():
     """Initialize database with required tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Config table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-    """)
     
     # User info table
     cursor.execute("""
@@ -94,38 +76,6 @@ def init_db():
             resurrected_at TEXT
         )
     """)
-    
-    conn.commit()
-    conn.close()
-
-def get_config(key: str) -> str | None:
-    """Get configuration value"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        try:
-            # Decrypt the value
-            return cipher.decrypt(row["value"].encode()).decode()
-        except:
-            return None
-    return None
-
-def save_config(key: str, value: str):
-    """Save configuration value (encrypted)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Encrypt the value
-    encrypted_value = cipher.encrypt(value.encode()).decode()
-    
-    cursor.execute("""
-        INSERT OR REPLACE INTO config (key, value) 
-        VALUES (?, ?)
-    """, (key, encrypted_value))
     
     conn.commit()
     conn.close()
