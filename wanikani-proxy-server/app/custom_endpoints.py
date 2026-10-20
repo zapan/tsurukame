@@ -326,64 +326,10 @@ async def get_study_materials(request: Request):
     return await proxy_request(request, path)
 
 @router.get("/level_progressions")
-async def get_level_progressions():
-    """Get level progressions (custom - based on local progress)"""
-    user_info = get_user_info()
-    current_level = user_info.get("level", 1)
-    
-    # Calculate level percentage based on completed items
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Count items at current level
-    cursor.execute("""
-        SELECT COUNT(*) as total
-        FROM assignments
-        WHERE level = ?
-    """, (current_level,))
-    
-    total = cursor.fetchone()["total"]
-    
-    # Count passed items at current level
-    cursor.execute("""
-        SELECT COUNT(*) as passed
-        FROM assignments
-        WHERE level = ? AND passed_at IS NOT NULL
-    """, (current_level,))
-    
-    passed = cursor.fetchone()["passed"]
-    
-    conn.close()
-    
-    # Calculate percentage
-    percentage = int((passed / total * 100)) if total > 0 else 0
-    
-    return {
-        "object": "collection",
-        "url": "/v2/level_progressions",
-        "pages": {
-            "per_page": 500,
-            "next_url": None,
-            "previous_url": None
-        },
-        "total_count": 1,
-        "data": [
-            {
-                "id": current_level,
-                "object": "level_progression",
-                "url": f"/v2/level_progressions/{current_level}",
-                "data": {
-                    "level": current_level,
-                    "started_at": user_info.get("started_at"),
-                    "unlocked_at": user_info.get("started_at"),
-                    "completed_at": None,
-                    "abandoned_at": None,
-                    "passed_at": None if percentage < 100 else datetime.utcnow().isoformat(),
-                    "percentage": percentage
-                }
-            }
-        ]
-    }
+async def get_level_progressions(request: Request):
+    """Get level progressions (proxied for now to see format)"""
+    path = "/level_progressions"
+    return await proxy_request(request, path)
 
 @router.get("/voice_actors")
 async def get_voice_actors(request: Request):
