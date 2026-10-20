@@ -7,13 +7,24 @@ async def proxy_request(request: Request, path: str):
     """Proxy request to Wanikani API using the token from the request header"""
     # Extract API key from Authorization header
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
+    
+    if not auth_header:
         raise HTTPException(
             status_code=401,
-            detail="Authorization header missing or invalid"
+            detail="Authorization header missing"
         )
     
-    api_key = auth_header.replace("Bearer ", "")
+    # Tsurukame uses format: "Token token=<api_key>"
+    # Extract the token after "token="
+    if auth_header.startswith("Token token="):
+        api_key = auth_header.replace("Token token=", "")
+    elif auth_header.startswith("Bearer "):
+        api_key = auth_header.replace("Bearer ", "")
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header format not supported"
+        )
     
     # Build the full URL
     url = f"{WANIKANI_API_BASE}{path}"
