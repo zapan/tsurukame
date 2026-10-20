@@ -8,7 +8,7 @@ A local proxy server that emulates the Wanikani API, allowing you to reset your 
 - **Custom Progress**: Manages your learning progress independently (SRS levels, assignments, reviews)
 - **Level 1 Reset**: Start fresh from level 1 while keeping your original Wanikani progress intact
 - **Local Database**: Uses SQLite to store your personal progress
-- **Configuration UI**: Simple web interface to set up your Wanikani API key
+- **No Additional Configuration**: Uses the API token from Tsurukame's Authorization header
 
 ## Setup
 
@@ -39,18 +39,14 @@ Or using uvicorn directly:
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Configuration
-
-1. Open your browser and go to: `http://localhost:8000/config`
-2. Enter your Wanikani API key (get it from https://www.wanikani.com/settings/personal_access_tokens)
-3. Click "Save Configuration"
-
 ### Configure Tsurukame
 
 1. Open Tsurukame app
 2. Go to Settings → Developer options
 3. Change "API base URL" to: `http://localhost:8000/v2`
 4. The app will now use your local proxy server
+
+**Note**: The proxy server automatically uses the API token that Tsurukame sends in the Authorization header. No additional configuration is needed.
 
 ## How It Works
 
@@ -86,7 +82,6 @@ The proxy implements Wanikani's SRS system with the following stages:
 
 The server uses SQLite (`wanikani_proxy.db`) with the following tables:
 
-- `config` - Stores encrypted API keys and other settings
 - `user_info` - Stores your local user profile
 - `assignments` - Tracks which items are assigned for learning/review
 - `review_statistics` - Stores SRS statistics for each item
@@ -94,9 +89,9 @@ The server uses SQLite (`wanikani_proxy.db`) with the following tables:
 
 ## Security
 
-- API keys are encrypted using Fernet symmetric encryption before storage
 - The server only runs locally (localhost) by default
 - No data is sent to external servers except the official Wanikani API for content
+- The API token from Tsurukame is used directly and not stored
 
 ## Troubleshooting
 
@@ -105,15 +100,10 @@ The server uses SQLite (`wanikani_proxy.db`) with the following tables:
 - Check if port 8000 is already in use
 - Ensure all dependencies are installed
 
-### API key errors
-- Verify your API key is valid in Wanikani settings
-- Make sure you've saved the API key in the configuration page
-- Check the server logs for error messages
-
 ### Tsurukame not connecting
 - Ensure the proxy server is running
 - Verify the API base URL is set to `http://localhost:8000/v2`
-- Check that your API key is configured
+- Check that your Wanikani API token is configured in Tsurukame
 
 ## Development
 
@@ -126,10 +116,7 @@ wanikani-proxy-server/
 │   ├── main.py              # FastAPI application entry point
 │   ├── database.py          # Database operations
 │   ├── proxy.py             # Proxy logic for Wanikani API
-│   ├── custom_endpoints.py  # Custom progress endpoints
-│   ├── templates/
-│   │   └── config.html      # Configuration UI
-│   └── static/              # Static files (if needed)
+│   └── custom_endpoints.py  # Custom progress endpoints
 ├── requirements.txt
 ├── README.md
 └── wanikani_proxy.db        # SQLite database (created on first run)
