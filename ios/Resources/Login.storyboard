@@ -53,8 +53,8 @@
                                                 <rect key="frame" x="195.5" y="0.0" width="44.5" height="34"/>
                                                 <color key="tintColor" systemColor="systemBackgroundColor"/>
                                                 <inset key="imageEdgeInsets" minX="0.0" minY="0.0" maxX="10" maxY="0.0"/>
-                                                <state key="normal" image="doc.on.clipboard" catalog="system"/>
-                                                <buttonConfiguration key="configuration" style="plain" image="doc.on.clipboard" catalog="system" imagePadding="10" buttonSize="small"/>
+                                                <state key="normal" image="document.on.clipboard" catalog="system"/>
+                                                <buttonConfiguration key="configuration" style="plain" image="document.on.clipboard" catalog="system" imagePadding="10" buttonSize="small"/>
                                                 <connections>
                                                     <action selector="didTapPasteButton:" destination="RE3-Ck-N2j" eventType="touchUpInside" id="CnR-4r-G7P"/>
                                                 </connections>
@@ -183,7 +183,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="doc.on.clipboard" catalog="system" width="116" height="128"/>
+        <image name="document.on.clipboard" catalog="system" width="116" height="128"/>
         <systemColor name="labelColor">
             <color white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>

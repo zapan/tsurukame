@@ -1515,7 +1515,9 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
 
   @IBAction func revealAnswerButtonPressed(_: Any) {
     let task = Settings.showFullAnswer ? nil : session.activeTask
-    subjectDetailsView.update(withSubject: session.activeSubject,
+    let translatedSubject = services.localCachingClient
+      .translateSubject(original: session.activeSubject)
+    subjectDetailsView.update(withSubject: translatedSubject,
                               studyMaterials: session.activeStudyMaterials,
                               assignment: session.activeAssignment, task: task)
 

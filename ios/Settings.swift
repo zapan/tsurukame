@@ -85,6 +85,38 @@ typealias SettingEnum = CaseIterable & Codable & CustomStringConvertible & RawRe
   }
 }
 
+enum TranslationLanguage: String, SettingEnum {
+  case spanish = "ES"
+  case french = "FR"
+  case german = "DE"
+  case italian = "IT"
+  case portuguese = "PT-PT"
+
+  var description: String {
+    switch self {
+    case .spanish: return "Español"
+    case .french: return "Français"
+    case .german: return "Deutsch"
+    case .italian: return "Italiano"
+    case .portuguese: return "Português (Europa)"
+    }
+  }
+
+  var flagEmoji: String {
+    switch self {
+    case .spanish: return "🇪🇸"
+    case .french: return "🇫🇷"
+    case .german: return "🇩🇪"
+    case .italian: return "🇮🇹"
+    case .portuguese: return "🇵🇹"
+    }
+  }
+
+  var displayName: String {
+    "\(flagEmoji) \(description)"
+  }
+}
+
 private func setArchiveData<T: Codable>(_ object: T, key: String) {
   var data: Data!
   if #available(iOS 11.0, *) {
@@ -268,6 +300,15 @@ protocol SettingProtocol {
 
   @Setting(false,
            #keyPath(dismissedRedesignFeedbackCard)) static var dismissedRedesignFeedbackCard: Bool
+
+  // MARK: - Translation Settings
+
+  @Setting(false, #keyPath(translationsEnabled)) static var translationsEnabled: Bool
+  @EnumSetting(TranslationLanguage.spanish,
+               "translationLanguage") static var translationLanguage: TranslationLanguage
+  @Setting("", #keyPath(deeplApiKey)) static var deeplApiKey: String
+  @Setting(true, #keyPath(translationAutoDownload)) static var translationAutoDownload: Bool
+  @Setting(false, #keyPath(translationCellular)) static var translationCellular: Bool
 
   // Converts settings stored by older versions of the app to their new form.
   static func migrate() {

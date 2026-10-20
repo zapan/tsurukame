@@ -553,6 +553,19 @@ class SubjectDetailsView: UITableView, SubjectChipDelegate {
       })
   }
 
+  private func addArtwork(_ subject: TKMSubject, _ model: MutableTableModel) {
+    // Add the Artwork section.
+    if #available(iOS 15.0, *), Settings.showArtwork,
+       services.reachability.isReachable(),
+       ArtworkManager.contains(subjectID: subject.id) {
+      model.add(section: "Artwork by @AmandaBear")
+      model.add(section: "")
+      model.add(ArtworkModelItem(subjectID: subject.id))
+      model.add(section: "")
+      model.add(section: "")
+    }
+  }
+
   public func update(withSubject subject: TKMSubject, studyMaterials: TKMStudyMaterials?,
                      assignment: TKMAssignment?, task: ReviewItem?,
                      alwaysShowLevel: Bool = false) {
@@ -614,6 +627,7 @@ class SubjectDetailsView: UITableView, SubjectChipDelegate {
       if !meaningShown {
         addShowAllButton(hiddenIndexPaths: [meanings, mnemonic, oldMnemonic], model: model)
       }
+      addArtwork(subject, model)
       addAmalgamationSubjects(subject, toModel: model)
     }
 
@@ -648,6 +662,7 @@ class SubjectDetailsView: UITableView, SubjectChipDelegate {
         addShowAllButton(hiddenIndexPaths: [readings, readingExplanation], model: model)
       }
 
+      addArtwork(subject, model)
       addSimilarKanji(subject, toModel: model)
       addAmalgamationSubjects(subject, toModel: model)
     }
@@ -724,14 +739,6 @@ class SubjectDetailsView: UITableView, SubjectChipDelegate {
       }
 
       // TODO: When possible in the API, add a resurrect button.
-    }
-
-    // Add the Artwork section.
-    if #available(iOS 15.0, *), Settings.showArtwork,
-       services.reachability.isReachable(),
-       ArtworkManager.contains(subjectID: subject.id) {
-      model.add(section: "Artwork by @AmandaBear")
-      model.add(ArtworkModelItem(subjectID: subject.id))
     }
 
     if optionsShown {

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F54B6C963046E12E00E59C71 /* TranslationLevelSelectorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54B6C953046E12E00E59C71 /* TranslationLevelSelectorViewController.swift */; };
+		F5FBB34E3042E5AB0006D66C /* TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34C3042E5AB0006D66C /* TranslationService.swift */; };
+		F5FBB34F3042E5AB0006D66C /* LocalCachingClient+Translations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */; };
+		F5FBB3503042E5AB0006D66C /* TranslationSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */; };
 		0A943349E17FA7889EFEE41F /* Pods_Tsurukame.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FC80AAF9736A570E3C4CC09E /* Pods_Tsurukame.framework */; };
 		1C1A27E594D03064CFACBADB /* FeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = 639CE0BC2CF0ABCE00902668 /* FeatureFlags.swift */; };
 		480B243123D6830300FC2A82 /* Rexy in Frameworks */ = {isa = PBXBuildFile; productRef = 480B243023D6830300FC2A82 /* Rexy */; };
@@ -286,6 +290,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F54B6C953046E12E00E59C71 /* TranslationLevelSelectorViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationLevelSelectorViewController.swift; sourceTree = "<group>"; };
+		F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LocalCachingClient+Translations.swift"; sourceTree = "<group>"; };
+		F5FBB34C3042E5AB0006D66C /* TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationService.swift; sourceTree = "<group>"; };
+		F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationSettingsViewController.swift; sourceTree = "<group>"; };
 		10E5709643045C62AD6AC427 /* Pods_Tests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Tests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		116070EC9485A78089387729 /* Pods-FontScreenshotterUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FontScreenshotterUITests.debug.xcconfig"; path = "Target Support Files/Pods-FontScreenshotterUITests/Pods-FontScreenshotterUITests.debug.xcconfig"; sourceTree = "<group>"; };
 		1BBBD142815F6A55FA9D2C21 /* libPods-Tsurukame Complication Extension.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Tsurukame Complication Extension.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -638,6 +646,10 @@
 		630FD60A1FC45BDF00D21C1F = {
 			isa = PBXGroup;
 			children = (
+				F5FBB34B3042E5AB0006D66C /* LocalCachingClient+Translations.swift */,
+				F5FBB34C3042E5AB0006D66C /* TranslationService.swift */,
+				F5FBB34D3042E5AB0006D66C /* TranslationSettingsViewController.swift */,
+				F54B6C953046E12E00E59C71 /* TranslationLevelSelectorViewController.swift */,
 				6324AE3D2F9DC7FF0089066C /* RadicalCharacterImages.swift */,
 				96A335062EEF5F800017BC70 /* BottomSheetAction.swift */,
 				999BBB1111CCAA22BB333344 /* BurnedReviewFiltersViewController.swift */,
@@ -1466,6 +1478,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F54B6C963046E12E00E59C71 /* TranslationLevelSelectorViewController.swift in Sources */,
+				F5FBB34E3042E5AB0006D66C /* TranslationService.swift in Sources */,
+				F5FBB34F3042E5AB0006D66C /* LocalCachingClient+Translations.swift in Sources */,
+				F5FBB3503042E5AB0006D66C /* TranslationSettingsViewController.swift in Sources */,
 				638D197525C6AA4B00B80544 /* MarkupModelItem.swift in Sources */,
 				63A5598527E433E000E7BBCB /* NavigationController.swift in Sources */,
 				638A5C4E25A471F9001A7AEE /* AppDelegate.swift in Sources */,

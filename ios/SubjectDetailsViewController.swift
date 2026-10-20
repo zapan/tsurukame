@@ -32,7 +32,7 @@ class SubjectDetailsViewController: UIViewController, SubjectDelegate, TKMViewCo
              hideBackButton: Bool = false,
              index: Int = 0) {
     self.services = services
-    self.subject = subject
+    self.subject = services.localCachingClient.translateSubject(original: subject)
     self.showHints = showHints
     self.hideBackButton = hideBackButton
     self.index = index

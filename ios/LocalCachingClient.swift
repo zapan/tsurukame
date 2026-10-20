@@ -62,6 +62,8 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
   private var busySyncing = false
   private var gotRecentMistakesCloudNotificationWhileSyncing = false
 
+  var databaseQueue: FMDatabaseQueue! { db }
+
   @Cached(notificationName: .lccPendingItemsChanged) var pendingProgressCount: Int
   @Cached(notificationName: .lccPendingItemsChanged) var pendingStudyMaterialsCount: Int
   @Cached(notificationName: .lccAvailableItemsChanged) var availableSubjects: (lessonCount: Int,
@@ -327,7 +329,23 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
     );
     CREATE INDEX idx_stat_subject_id ON review_stats (subject_id);
     """,
-    // Version 13. WaniKani sometimes gives an existing subject a new assignment ID. Older
+    // Version 13. Translations table for localized mnemonics and explanations.
+    """
+    CREATE TABLE translations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        target_lang TEXT NOT NULL,
+        original_hash TEXT NOT NULL,
+        pb BLOB NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(subject_id, target_lang)
+    );
+    CREATE INDEX idx_translations_subject_id ON translations (subject_id);
+    CREATE INDEX idx_translations_lang ON translations (target_lang);
+    CREATE INDEX idx_translations_hash ON translations (original_hash);
+    """,
+    // Version 14. WaniKani sometimes gives an existing subject a new assignment ID. Older
     // versions kept the stale assignments alongside the new one, so subjects appeared several
     // times in lists. Keep only the newest (highest ID) assignment for each subject.
     """
@@ -338,7 +356,7 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
   ]
 
   private let kInitialSchemaVersion = 8
-  private let kSchemaVersion = 13
+  private let kSchemaVersion = 14
 
   // Run when the user logs out. Clears everything in the database.
   private let kClearAllData = """
@@ -357,6 +375,7 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
   DELETE FROM error_log;
   DELETE FROM level_progressions;
   DELETE FROM subjects;
+  DELETE FROM translations;
   DELETE FROM voice_actors;
   DELETE FROM audio_urls;
   DELETE FROM review_stats;
@@ -1462,7 +1481,7 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
       Int64(pendingStudyMaterials.count) +
       subjectProgressUnits +
       assignmentProgressUnits +
-      5
+      6 // Increased from 5 to 6 to include translations
 
     let childProgress = { (units: Int64) in
       Progress(totalUnitCount: -1, parent: progress, pendingUnitCount: units)
@@ -1499,6 +1518,10 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
         self.fetchLevelProgression(progress: childProgress(1)),
         self.fetchVoiceActors(progress: childProgress(1)),
         self.fetchReviewStatistics(progress: childProgress(1)),
+        // Fetch translations if enabled and auto-download is on
+        Settings.translationsEnabled && Settings.translationAutoDownload
+          ? self.startTranslationSync(progress: childProgress(1))
+          : Promise.value(()),
       ])
     }.ensure {
       // we need to make sure that our current, local batch of recent mistakes go up to the cloud

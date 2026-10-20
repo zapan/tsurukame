@@ -348,7 +348,7 @@ public class WaniKaniAPIClient: NSObject {
         }
         seenIds.insert(id)
 
-        if let objectType = data.object,
+        if let _ = data.object,
            let subject = data.data.toProto(id: id) {
           ret.append(subject)
         }
