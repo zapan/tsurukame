@@ -36,31 +36,16 @@ SRS_INTERVALS = {
 }
 
 @router.get("/user")
-async def get_user():
-    """Get user information (custom)"""
-    user_info = get_user_info()
+async def get_user(request: Request):
+    """Get user information (proxied for now to see format)"""
+    path = "/user"
+    response = await proxy_request(request, path)
     
-    return {
-        "id": "local-user",
-        "username": user_info.get("username", "Local User"),
-        "level": user_info.get("level", 1),
-        "max_level": 60,
-        "profile_url": None,
-        "started_at": user_info.get("started_at"),
-        "current_vacation_started_at": None,
-        "subscription": {
-            "active": True,
-            "max_level": 60,
-            "period_ends_at": None
-        },
-        "preferences": {
-            "lessons_autoplay_audio": True,
-            "lessons_batch_size": 5,
-            "lessons_presentation_order": "level",
-            "reviews_autoplay_audio": True,
-            "reviews_display_srs_indicator": True
-        }
-    }
+    # Override level to 1
+    if "data" in response:
+        response["data"]["level"] = 1
+    
+    return response
 
 @router.get("/subjects")
 async def get_subjects(request: Request):
@@ -90,97 +75,51 @@ async def get_subject(subject_id: int, request: Request):
 
 @router.get("/assignments")
 async def get_assignments(request: Request):
-    """Get assignments (custom - based on local progress)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    """Get assignments (proxied and filtered by level 1)"""
+    # Proxy the request to Wanikani
+    path = "/assignments"
+    response = await proxy_request(request, path)
     
-    # Get all assignments
-    cursor.execute("""
-        SELECT * FROM assignments
-        WHERE passed_at IS NULL
-        ORDER BY available_at ASC
-    """)
+    # Filter assignments to only show level 1
+    if "data" in response:
+        filtered_data = [
+            assignment for assignment in response["data"]
+            if assignment["data"]["level"] == 1
+        ]
+        response["data"] = filtered_data
+        response["total_count"] = len(filtered_data)
     
-    assignments = []
-    for row in cursor.fetchall():
-        assignments.append({
-            "id": row["id"],
-            "object": "assignment",
-            "url": f"/v2/assignments/{row['id']}",
-            "data": {
-                "created_at": row["created_at"],
-                "subject_id": row["subject_id"],
-                "subject_type": row["subject_type"],
-                "level": row["level"],
-                "srs_stage": row["srs_stage"],
-                "available_at": row["available_at"],
-                "started_at": row["started_at"],
-                "passed_at": row["passed_at"]
-            }
-        })
-    
-    conn.close()
-    
-    return {
-        "object": "collection",
-        "url": "/v2/assignments",
-        "pages": {
-            "per_page": 500,
-            "next_url": None,
-            "previous_url": None
-        },
-        "total_count": len(assignments),
-        "data": assignments
-    }
+    return response
 
 @router.get("/reviews")
 async def get_reviews(request: Request):
-    """Get reviews (custom - based on local SRS)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    """Get reviews (proxied and filtered by level 1 assignments)"""
+    # First get assignments filtered by level 1
+    path = "/assignments"
+    assignments_response = await proxy_request(request, path)
     
-    current_time = datetime.utcnow()
+    # Filter to level 1 assignments
+    level_1_assignments = []
+    if "data" in assignments_response:
+        level_1_assignments = [
+            assignment for assignment in assignments_response["data"]
+            if assignment["data"]["level"] == 1
+        ]
     
-    # Get assignments that are due for review
-    cursor.execute("""
-        SELECT a.*, rs.meaning_correct, rs.meaning_incorrect, 
-               rs.reading_correct, rs.reading_incorrect
-        FROM assignments a
-        LEFT JOIN review_statistics rs ON a.subject_id = rs.subject_id
-        WHERE a.passed_at IS NULL 
-        AND (a.available_at IS NULL OR datetime(a.available_at) <= ?)
-        ORDER BY a.available_at ASC
-    """, (current_time.isoformat(),))
+    # Now get reviews and filter by level 1 assignments
+    path = "/reviews"
+    response = await proxy_request(request, path)
     
-    reviews = []
-    for row in cursor.fetchall():
-        reviews.append({
-            "id": row["id"],
-            "object": "review",
-            "url": f"/v2/reviews/{row['id']}",
-            "data": {
-                "created_at": row["created_at"],
-                "assignment_id": row["id"],
-                "subject_id": row["subject_id"],
-                "subject_type": row["subject_type"],
-                "starting_srs_stage": row["srs_stage"],
-                "ending_srs_stage": row["srs_stage"]
-            }
-        })
+    if "data" in response:
+        assignment_ids = set(a["id"] for a in level_1_assignments)
+        filtered_data = [
+            review for review in response["data"]
+            if review["data"]["assignment_id"] in assignment_ids
+        ]
+        response["data"] = filtered_data
+        response["total_count"] = len(filtered_data)
     
-    conn.close()
-    
-    return {
-        "object": "collection",
-        "url": "/v2/reviews",
-        "pages": {
-            "per_page": 500,
-            "next_url": None,
-            "previous_url": None
-        },
-        "total_count": len(reviews),
-        "data": reviews
-    }
+    return response
 
 @router.post("/reviews")
 async def create_review(request: Request):
@@ -293,31 +232,9 @@ async def start_lesson(lesson_id: int):
 
 @router.get("/summary")
 async def get_summary(request: Request):
-    """Get summary (proxied with custom review counts)"""
-    # Get review count from local database
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    current_time = datetime.utcnow()
-    cursor.execute("""
-        SELECT COUNT(*) as count
-        FROM assignments
-        WHERE passed_at IS NULL 
-        AND (available_at IS NULL OR datetime(available_at) <= ?)
-    """, (current_time.isoformat(),))
-    
-    review_count = cursor.fetchone()["count"]
-    conn.close()
-    
-    # Proxy the summary request
+    """Get summary (proxied)"""
     path = "/summary"
-    response = await proxy_request(request, path)
-    
-    # Override review counts
-    if "data" in response:
-        response["data"]["reviews"] = review_count
-    
-    return response
+    return await proxy_request(request, path)
 
 @router.get("/study_materials")
 async def get_study_materials(request: Request):
@@ -338,47 +255,19 @@ async def get_voice_actors(request: Request):
     return await proxy_request(request, path)
 
 @router.get("/review_statistics")
-async def get_review_statistics():
-    """Get review statistics (custom - based on local database)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+async def get_review_statistics(request: Request):
+    """Get review statistics (proxied and filtered by level 1)"""
+    # Proxy the request to Wanikani
+    path = "/review_statistics"
+    response = await proxy_request(request, path)
     
-    cursor.execute("""
-        SELECT * FROM review_statistics
-    """)
+    # Filter statistics to only show level 1
+    if "data" in response:
+        filtered_data = [
+            stat for stat in response["data"]
+            if stat["data"]["level"] == 1
+        ]
+        response["data"] = filtered_data
+        response["total_count"] = len(filtered_data)
     
-    stats = []
-    for row in cursor.fetchall():
-        stats.append({
-            "id": row["subject_id"],
-            "object": "review_statistic",
-            "url": f"/v2/review_statistics/{row['subject_id']}",
-            "data": {
-                "created_at": row["created_at"],
-                "subject_id": row["subject_id"],
-                "subject_type": row["subject_type"],
-                "meaning_correct": row["meaning_correct"],
-                "meaning_incorrect": row["meaning_incorrect"],
-                "meaning_current_streak": row["meaning_current_streak"],
-                "meaning_max_streak": row["meaning_max_streak"],
-                "reading_correct": row["reading_correct"],
-                "reading_incorrect": row["reading_incorrect"],
-                "reading_current_streak": row["reading_current_streak"],
-                "reading_max_streak": row["reading_max_streak"],
-                "percentage": 0  # Calculate if needed
-            }
-        })
-    
-    conn.close()
-    
-    return {
-        "object": "collection",
-        "url": "/v2/review_statistics",
-        "pages": {
-            "per_page": 500,
-            "next_url": None,
-            "previous_url": None
-        },
-        "total_count": len(stats),
-        "data": stats
-    }
+    return response
