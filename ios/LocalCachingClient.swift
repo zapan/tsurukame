@@ -329,7 +329,18 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
     );
     CREATE INDEX idx_stat_subject_id ON review_stats (subject_id);
     """,
-    // Version 13. Translations table for localized mnemonics and explanations.
+    // Version 13. WaniKani sometimes gives an existing subject a new assignment ID. Older
+    // versions kept the stale assignments alongside the new one, so subjects appeared several
+    // times in lists. Keep only the newest (highest ID) assignment for each subject.
+    """
+    DELETE FROM assignments WHERE id NOT IN (
+      SELECT MAX(id) FROM assignments GROUP BY subject_id
+    );
+    """,
+    // Version 14. New parts of speech were added. Clear the sync marker so all subjects are
+    // downloaded again with the new values.
+    "UPDATE sync SET subjects_updated_after = \"\";",
+    // Version 15. Translations table for localized mnemonics and explanations.
     """
     CREATE TABLE translations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -345,21 +356,10 @@ class LocalCachingClient: NSObject, SubjectLevelGetter {
     CREATE INDEX idx_translations_lang ON translations (target_lang);
     CREATE INDEX idx_translations_hash ON translations (original_hash);
     """,
-    // Version 14. WaniKani sometimes gives an existing subject a new assignment ID. Older
-    // versions kept the stale assignments alongside the new one, so subjects appeared several
-    // times in lists. Keep only the newest (highest ID) assignment for each subject.
-    """
-    DELETE FROM assignments WHERE id NOT IN (
-      SELECT MAX(id) FROM assignments GROUP BY subject_id
-    );
-    """,
-    // Version 14. New parts of speech were added. Clear the sync marker so all subjects are
-    // downloaded again with the new values.
-    "UPDATE sync SET subjects_updated_after = \"\";",
   ]
 
   private let kInitialSchemaVersion = 8
-  private let kSchemaVersion = 14
+  private let kSchemaVersion = 15
 
   // Run when the user logs out. Clears everything in the database.
   private let kClearAllData = """
