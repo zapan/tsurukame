@@ -1,3 +1,4 @@
+.idea
 /data
 /data.bin
 .DS_Store
@@ -15,4 +16,3 @@
 /ios/*.dSYM.zip
 /workspace
 /ios/gc_keys.json
-.idea
