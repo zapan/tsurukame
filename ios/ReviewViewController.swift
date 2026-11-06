@@ -220,6 +220,10 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
   private var animationDuration: Double = kDefaultAnimationDuration
   private var animationCurve: UIView.AnimationCurve = kDefaultAnimationCurve
   private var previousKeyboardInsetHeight: CGFloat?
+  // The keyboard's inset height the last time it was shown.  Unlike previousKeyboardInsetHeight
+  // this isn't cleared when the keyboard hides, so we can put the answer field back in the right
+  // place before the keyboard reappears.
+  private var lastShownKeyboardInsetHeight: CGFloat?
 
   private var currentFontName: String!
   private var availableFonts: [String]?
@@ -244,6 +248,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
   private var chipsInset: CGFloat = 0
   // How far the subject is nudged to stay put when the keyboard changes size slightly.
   private var keyboardNudge: CGFloat = 0
+  private let waves = WavesView()
   @IBOutlet private var questionBackground: GradientView!
   @IBOutlet private var promptBackground: GradientView!
   @IBOutlet private var questionLabel: UILabel!
@@ -328,7 +333,6 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
     questionBackground.layer.cornerCurve = .continuous
     questionBackground.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
     questionBackground.clipsToBounds = true
-    let waves = WavesView()
     waves.waveColor = UIColor.white.withAlphaComponent(0.08)
     // A faint dark fill between the lines, like the mocks.
     waves.fillColor = UIColor.black.withAlphaComponent(0.08)
@@ -743,6 +747,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
     let insetHeight = max(0, CGFloat(height) - distanceFromViewBottomToWindowBottom)
 
     answerFieldToBottomConstraint.constant = insetHeight
+    lastShownKeyboardInsetHeight = insetHeight
 
     // When the keyboard changes size by a small amount (the autocorrect bar is shown/hidden) try
     // to avoid moving the question label by offsetting its bottom constraint by the same amount the
@@ -1074,6 +1079,13 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
     answerFieldToBottomConstraint.isActive = !shown
     if shown {
       keyboardNudge = 0
+    } else if updateFirstResponder, !isAnkiModeActiveForCurrentTask, !answerField.isFirstResponder,
+              let keyboardInsetHeight = lastShownKeyboardInsetHeight {
+      // The keyboard is about to reappear, but keyboardWillShow arrives after this layout pass.
+      // Without this the answer field would animate towards the bottom of the screen, then the
+      // keyboard's own animation would be added on top, making the question overshoot and
+      // bounce back up.  Move it straight to where the keyboard will put it instead.
+      answerFieldToBottomConstraint.constant = keyboardInsetHeight
     }
     updateChipsInset(subjectDetailsShown: shown)
 
@@ -1285,6 +1297,7 @@ class ReviewViewController: UIViewController, UITextFieldDelegate, SubjectDelega
   }
 
   func quickSettingsChanged() {
+    waves.isHidden = !Settings.showWavesBackground
     if subjectDetailsView.isHidden {
       updateViewForCurrentTask(updateFirstResponder: false)
     }
